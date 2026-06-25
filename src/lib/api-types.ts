@@ -76,6 +76,20 @@ export interface SignalDTO {
   ts: number;
 }
 
+export interface SportsDTO {
+  available: boolean;
+  team?: {
+    name: string;
+    sport: string | null;
+    league: string | null;
+    country: string | null;
+    badge: string | null;
+    blurb: string | null;
+  };
+  recent?: { date: string | null; event: string; score: string | null }[];
+  next?: { date: string | null; event: string } | null;
+}
+
 export interface BacktestDTO {
   count: number;
   hitRate: number | null;

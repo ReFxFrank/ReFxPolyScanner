@@ -263,6 +263,24 @@ export function deleteEstimate(id: number): boolean {
   return db().prepare(`DELETE FROM estimates WHERE id = ?`).run(id).changes > 0;
 }
 
+// ── Sports cache ───────────────────────────────────────────────────────────
+export function getSportsCache(k: string): { payload: string; ts: number } | null {
+  return (
+    (db()
+      .prepare(`SELECT payload, ts FROM sports_cache WHERE k = ?`)
+      .get(k) as { payload: string; ts: number } | undefined) ?? null
+  );
+}
+
+export function setSportsCache(k: string, payload: string, ts: number): void {
+  db()
+    .prepare(
+      `INSERT INTO sports_cache (k, payload, ts) VALUES (?, ?, ?)
+       ON CONFLICT(k) DO UPDATE SET payload = ?, ts = ?`
+    )
+    .run(k, payload, ts, payload, ts);
+}
+
 export function resolveEstimate(id: number, outcome: number): boolean {
   return (
     db()

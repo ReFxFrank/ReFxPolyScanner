@@ -61,6 +61,12 @@ function migrate(conn: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_signals_ts ON signals(ts);
 
+    -- Cache for external sports-stats lookups (TheSportsDB). Keyed by a
+    -- normalized query; payload is JSON. Keeps third-party calls rare.
+    CREATE TABLE IF NOT EXISTS sports_cache (
+      k TEXT PRIMARY KEY, payload TEXT, ts INTEGER
+    );
+
     -- Single-row poller health record (id = 1).
     CREATE TABLE IF NOT EXISTS poller_health (
       id INTEGER PRIMARY KEY CHECK (id = 1),
