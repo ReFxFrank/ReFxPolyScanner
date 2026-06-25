@@ -3,9 +3,12 @@
 import { useState } from "react";
 import type { MarketViewDTO } from "@/lib/api-types";
 import { pct } from "@/lib/format";
+import { GlassPanel } from "./ui/GlassPanel";
+import { Button, Eyebrow, Input } from "./ui/Controls";
 
-// Log your YES probability for a market. DIVERGE then surfaces automatically
-// in the table when your view differs from the market beyond the threshold.
+// Log your YES probability for a market. DIVERGE then surfaces automatically in
+// the table when your view differs from the market beyond the threshold. Kept
+// tight — this is a quick logging action, not a form.
 export function EstimateEditor({
   view,
   onChange,
@@ -45,17 +48,15 @@ export function EstimateEditor({
   }
 
   return (
-    <div className="rounded-lg border border-panel-border bg-panel-bg p-3">
+    <GlassPanel className="p-3.5">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-panel-muted">
-          Your estimate
-        </span>
-        <span className="text-xs text-panel-muted">
-          market mid {pct(view.impliedProb, 0)}
+        <Eyebrow>Your estimate</Eyebrow>
+        <span className="text-xs text-refx-meta tabular">
+          market mid <span className="text-refx-muted">{pct(view.impliedProb, 0)}</span>
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <div className="flex items-center rounded border border-panel-border bg-panel-surface">
+        <div className="flex items-center rounded-refx-sm border border-refx-soft bg-refx-900/60 focus-within:border-refx-blue">
           <input
             type="number"
             min={0}
@@ -63,29 +64,25 @@ export function EstimateEditor({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder="—"
-            className="w-16 bg-transparent px-2 py-1.5 text-right tabular outline-none"
+            className="w-16 bg-transparent px-2.5 py-1.5 text-right tabular text-refx-text outline-none"
           />
-          <span className="pr-2 text-panel-muted">% YES</span>
+          <span className="pr-2.5 text-xs text-refx-meta">% YES</span>
         </div>
-        <input
+        <Input
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="note (optional)"
-          className="flex-1 rounded border border-panel-border bg-panel-surface px-2 py-1.5 text-sm outline-none"
+          className="flex-1"
         />
-        <button
-          onClick={save}
-          disabled={busy}
-          className="rounded bg-flag-diverge/20 px-3 py-1.5 text-sm font-medium text-flag-diverge hover:bg-flag-diverge/30 disabled:opacity-50"
-        >
+        <Button variant="primary" onClick={save} disabled={busy}>
           {view.estimate ? "Update" : "Log call"}
-        </button>
+        </Button>
       </div>
-      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
-      <p className="mt-2 text-[11px] leading-snug text-panel-muted">
-        Edge is divergence from the market — not the market consensus itself.
-        Only log a number you believe is genuinely better-informed.
+      {error && <p className="mt-1.5 text-xs text-status-error">{error}</p>}
+      <p className="mt-2 text-[11px] leading-snug text-refx-meta">
+        Edge is divergence from the market — not the market consensus itself. Only
+        log a number you believe is genuinely better-informed.
       </p>
-    </div>
+    </GlassPanel>
   );
 }

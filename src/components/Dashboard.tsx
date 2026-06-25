@@ -5,13 +5,22 @@ import type { HealthDTO, MarketViewDTO } from "@/lib/api-types";
 import { StatusBar } from "./StatusBar";
 import { MarketTable, type SortKey } from "./MarketTable";
 import { MarketDetail } from "./MarketDetail";
+import { Select } from "./ui/Controls";
 
 type FlagFilter = "" | "ARB" | "WIDE" | "DIVERGE";
 
 const REFRESH_MS = 10_000;
 
-// The glance-first dashboard: status bar + filterable/sortable table, polling
-// the local cache (cheap) every ~10s. A click opens the market detail drawer.
+const FILTERS: { key: FlagFilter; label: string; cls: string }[] = [
+  { key: "", label: "All", cls: "" },
+  { key: "ARB", label: "ARB", cls: "data-[on=true]:text-flagc-arb data-[on=true]:border-flagc-arb/40" },
+  { key: "WIDE", label: "WIDE", cls: "data-[on=true]:text-flagc-wide data-[on=true]:border-flagc-wide/40" },
+  { key: "DIVERGE", label: "DIVERGE", cls: "data-[on=true]:text-flagc-diverge data-[on=true]:border-refx-blue-strong" },
+];
+
+// Glance-first dashboard: status bar + filterable/sortable table, polling the
+// local cache (cheap) every ~10s. A click opens the detail drawer. The
+// auto-refresh updates cells in place (stable slug keys) with a calm tick.
 export function Dashboard() {
   const [markets, setMarkets] = useState<MarketViewDTO[]>([]);
   const [health, setHealth] = useState<HealthDTO | null>(null);
@@ -45,43 +54,57 @@ export function Dashboard() {
       <StatusBar health={health} markets={markets} />
 
       <div className="flex flex-wrap items-center gap-2">
-        <FilterChip label="All" active={flag === ""} onClick={() => setFlag("")} />
-        <FilterChip label="ARB" active={flag === "ARB"} onClick={() => setFlag("ARB")} cls="text-flag-arb" />
-        <FilterChip label="WIDE" active={flag === "WIDE"} onClick={() => setFlag("WIDE")} cls="text-flag-wide" />
-        <FilterChip label="DIVERGE" active={flag === "DIVERGE"} onClick={() => setFlag("DIVERGE")} cls="text-flag-diverge" />
-        <div className="ml-auto flex items-center gap-2 text-sm text-panel-muted">
-          <label htmlFor="minvol">min 24h vol</label>
-          <select
+        {FILTERS.map((f) => (
+          <button
+            key={f.key}
+            data-on={flag === f.key}
+            onClick={() => setFlag(f.key)}
+            className={[
+              "rounded-full border px-3 py-1 text-xs font-medium transition-colors duration-150",
+              "border-refx-soft text-refx-meta hover:text-refx-text",
+              "data-[on=true]:bg-white/[0.04] data-[on=true]:text-refx-text data-[on=true]:border-refx-blue",
+              f.cls,
+            ].join(" ")}
+          >
+            {f.label}
+          </button>
+        ))}
+        <div className="ml-auto flex items-center gap-2 text-sm text-refx-meta">
+          <label htmlFor="minvol" className="eyebrow">min 24h vol</label>
+          <Select
             id="minvol"
             value={minVolume}
             onChange={(e) => setMinVolume(Number(e.target.value))}
-            className="rounded border border-panel-border bg-panel-surface px-2 py-1 text-sm text-white outline-none"
           >
             <option value={0}>any</option>
             <option value={1000}>$1k</option>
             <option value={10000}>$10k</option>
             <option value={100000}>$100k</option>
             <option value={1000000}>$1M</option>
-          </select>
+          </Select>
         </div>
       </div>
 
       {!loaded ? (
-        <p className="text-sm text-panel-muted">Loading markets…</p>
+        <div className="rounded-refx glass px-8 py-12 text-center text-sm text-refx-meta">
+          Loading markets…
+        </div>
       ) : (
         <MarketTable
           markets={markets}
           sort={sort}
           onSort={setSort}
           onSelect={setSelected}
+          selectedSlug={selected}
         />
       )}
 
-      <p className="text-[11px] leading-snug text-panel-muted">
-        Implied % is the market&apos;s consensus, not an edge signal and not a
-        ranking of &ldquo;most likely to win.&rdquo; The only edge signal here is
-        DIVERGE (your estimate vs the market). ARB is shown gross, capped by
-        depth, before fees.
+      <p className="text-[11px] leading-relaxed text-refx-meta">
+        Implied&nbsp;% is the market&apos;s consensus — not an edge signal and not
+        a ranking of &ldquo;most likely to win.&rdquo; The only edge signal here is{" "}
+        <span className="text-flagc-diverge">DIVERGE</span> (your estimate vs the
+        market). <span className="text-flagc-arb">ARB</span> is shown gross, capped
+        by depth, before fees.
       </p>
 
       {selected && (
@@ -93,31 +116,6 @@ export function Dashboard() {
   );
 }
 
-function FilterChip({
-  label,
-  active,
-  onClick,
-  cls = "",
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  cls?: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1 text-xs font-medium ${
-        active
-          ? "border-white/40 bg-panel-surface text-white"
-          : "border-panel-border text-panel-muted hover:text-white"
-      } ${cls}`}
-    >
-      {label}
-    </button>
-  );
-}
-
 function Drawer({
   children,
   onClose,
@@ -126,12 +124,15 @@ function Drawer({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-30 flex justify-end">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative z-10 h-full w-full max-w-xl overflow-y-auto border-l border-panel-border bg-panel-bg p-5 shadow-2xl">
+    <div className="fixed inset-0 z-40 flex justify-end">
+      <div
+        className="absolute inset-0 bg-refx-900/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative z-10 h-full w-full max-w-xl animate-fade-in overflow-y-auto border-l border-refx-blue bg-refx-shell p-5 shadow-2xl">
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 text-panel-muted hover:text-white"
+          className="absolute right-4 top-4 text-refx-meta transition-colors hover:text-refx-text"
           aria-label="Close"
         >
           ✕

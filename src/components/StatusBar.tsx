@@ -2,18 +2,10 @@
 
 import type { HealthDTO, MarketViewDTO } from "@/lib/api-types";
 import { ago } from "@/lib/format";
+import { GlassPanel } from "./ui/GlassPanel";
+import { StatusPill } from "./ui/StatusPill";
 
-const DOT: Record<HealthDTO["status"], string> = {
-  ok: "bg-flag-arb",
-  stale: "bg-flag-wide",
-  down: "bg-red-500",
-};
-
-const LABEL: Record<HealthDTO["status"], string> = {
-  ok: "live",
-  stale: "stale",
-  down: "down",
-};
+const KIND = { ok: "live", stale: "stale", down: "error" } as const;
 
 export function StatusBar({
   health,
@@ -28,36 +20,35 @@ export function StatusBar({
   const status = health?.status ?? "down";
 
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-panel-border bg-panel-surface px-4 py-2.5 text-sm">
-      <div className="flex items-center gap-2">
-        <span className={`h-2.5 w-2.5 rounded-full ${DOT[status]} ${status === "ok" ? "animate-pulse" : ""}`} />
-        <span className="font-medium">Poller {LABEL[status]}</span>
-      </div>
-      <span className="text-panel-muted tabular">
-        updated {ago(health?.lastSuccess, health?.now)}
+    <GlassPanel beam className="flex flex-wrap items-center gap-x-5 gap-y-2.5 px-4 py-3">
+      <StatusPill kind={KIND[status]} />
+      <span className="text-sm text-refx-muted tabular">
+        updated <span className="text-refx-text">{ago(health?.lastSuccess, health?.now)}</span>
       </span>
-      <span className="text-panel-muted tabular">
-        {health?.marketCount ?? markets.length} markets
+      <span className="text-sm text-refx-muted tabular">
+        <span className="text-refx-text">{health?.marketCount ?? markets.length}</span> markets
       </span>
-      <div className="ml-auto flex items-center gap-3 tabular">
-        <Count label="ARB" n={arb} cls="text-flag-arb" />
-        <Count label="WIDE" n={wide} cls="text-flag-wide" />
-        <Count label="DIVERGE" n={diverge} cls="text-flag-diverge" />
+
+      <div className="ml-auto flex items-center gap-2.5 tabular">
+        <Counter label="ARB" n={arb} cls="text-flagc-arb border-flagc-arb/30 bg-flagc-arb/8" />
+        <Counter label="WIDE" n={wide} cls="text-flagc-wide border-flagc-wide/25 bg-flagc-wide/8" />
+        <Counter label="DIVERGE" n={diverge} cls="text-flagc-diverge border-refx-blue-strong bg-refx-blue/10" />
       </div>
+
       {status !== "ok" && health?.lastError && (
-        <span className="w-full truncate text-xs text-red-400">
+        <span className="w-full truncate border-t border-refx-faint pt-2 text-xs text-status-error">
           last error: {health.lastError}
         </span>
       )}
-    </div>
+    </GlassPanel>
   );
 }
 
-function Count({ label, n, cls }: { label: string; n: number; cls: string }) {
+function Counter({ label, n, cls }: { label: string; n: number; cls: string }) {
   return (
-    <span className="flex items-center gap-1.5">
-      <span className={`font-semibold ${cls}`}>{n}</span>
-      <span className="text-[11px] uppercase tracking-wide text-panel-muted">
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${cls}`}>
+      <span className="text-sm font-semibold">{n}</span>
+      <span className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
         {label}
       </span>
     </span>

@@ -4,26 +4,108 @@
 
 :root {
   color-scheme: dark;
+  /* Palette as CSS vars so Recharts/inline styles can reference ReFx tokens. */
+  --refx-blue: #0072ff;
+  --refx-blue2: #58a7d3;
+  --refx-text: #eef6ff;
+  --refx-muted: rgba(216, 234, 255, 0.72);
+  --refx-meta: rgba(188, 216, 255, 0.56);
+  --refx-label: rgba(140, 196, 255, 0.7);
+  --refx-grid: rgba(255, 255, 255, 0.06);
+  --refx-card-border: rgba(255, 255, 255, 0.08);
+  --refx-800: #0a111d;
+  --refx-700: #0f1828;
 }
 
 html,
 body {
-  background: #0b0f14;
-  color: #e5edf5;
+  /* Deep navy/blue-black shell with faint radial accent glows. */
+  background-color: #070b12;
+  background-image:
+    radial-gradient(900px 500px at 18% -8%, rgba(0, 114, 255, 0.1), transparent 60%),
+    radial-gradient(800px 480px at 100% 0%, rgba(88, 167, 211, 0.07), transparent 55%),
+    linear-gradient(180deg, #0a111d 0%, #070b12 100%);
+  background-attachment: fixed;
+  color: var(--refx-text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Dense, monospace-leaning numerics for a market panel. */
+/* Tabular numerics everywhere numbers are shown — columns must align. */
 .tabular {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
 
-/* Thin scrollbars to keep the dense layout calm. */
+/* Uppercase high-tracking muted-blue eyebrow/label. */
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  color: var(--refx-label);
+  font-weight: 600;
+}
+
+/* Glass surface utilities. */
+.glass {
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.015)
+  );
+  border: 1px solid var(--refx-card-border);
+  box-shadow:
+    0 10px 30px -12px rgba(2, 8, 20, 0.8),
+    0 1px 0 0 rgba(255, 255, 255, 0.04) inset;
+  backdrop-filter: blur(6px);
+}
+.glass-strong {
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
+}
+
+/* Thin top-edge beam used inside panels. */
+.beam-top::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(125, 183, 255, 0.35),
+    transparent
+  );
+}
+
+/* Calm cell tick on value change. */
+.tick-flash {
+  animation: tick 900ms ease-out;
+}
+
+/* Thin, quiet scrollbars. */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1f2937;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(125, 183, 255, 0.22);
+}
+
+/* Honor reduced-motion: kill pulses, ticks, and fades. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

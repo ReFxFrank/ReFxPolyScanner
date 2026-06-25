@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { GlassPanel } from "./ui/GlassPanel";
+import { Button, Eyebrow, Input } from "./ui/Controls";
 
 export function LoginForm() {
   const [password, setPassword] = useState("");
@@ -26,28 +28,30 @@ export function LoginForm() {
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="mx-auto mt-24 max-w-sm rounded-lg border border-panel-border bg-panel-surface p-6"
-    >
-      <h1 className="mb-1 text-lg font-semibold">ReFx PolyPanel</h1>
-      <p className="mb-4 text-sm text-panel-muted">Enter the panel password.</p>
-      <input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        autoFocus
-        placeholder="Password"
-        className="w-full rounded border border-panel-border bg-panel-bg px-3 py-2 outline-none"
-      />
-      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
-      <button
-        type="submit"
-        disabled={busy}
-        className="mt-4 w-full rounded bg-flag-arb/20 px-3 py-2 font-medium text-flag-arb hover:bg-flag-arb/30 disabled:opacity-50"
-      >
-        {busy ? "…" : "Sign in"}
-      </button>
-    </form>
+    <GlassPanel beam className="mx-auto mt-24 max-w-sm animate-fade-in p-6">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-refx-blue-glass text-[11px] text-white shadow-refx-glow">
+          ◆
+        </span>
+        <h1 className="font-semibold tracking-tight text-refx-text2">
+          ReFx <span className="text-refx-blueText">PolyPanel</span>
+        </h1>
+      </div>
+      <Eyebrow className="mb-4">Enter the panel password</Eyebrow>
+      <form onSubmit={submit}>
+        <Input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoFocus
+          placeholder="Password"
+          className="w-full"
+        />
+        {error && <p className="mt-2 text-sm text-status-error">{error}</p>}
+        <Button type="submit" variant="primary" disabled={busy} className="mt-4 w-full">
+          {busy ? "…" : "Sign in"}
+        </Button>
+      </form>
+    </GlassPanel>
   );
 }

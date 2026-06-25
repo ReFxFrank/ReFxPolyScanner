@@ -6,9 +6,11 @@ import { cents, pct, usd } from "@/lib/format";
 import { FlagChip } from "./FlagChip";
 import { ProbChart } from "./ProbChart";
 import { EstimateEditor } from "./EstimateEditor";
+import { GlassPanel } from "./ui/GlassPanel";
+import { Eyebrow } from "./ui/Controls";
 
 // Market detail: full Yes/No book, the binary-arb readout (gross, with depth +
-// fee caveats inline), the probability-over-time chart, and the estimate editor.
+// fee caveats inline and visible), the probability-over-time chart, the editor.
 export function MarketDetail({ slug }: { slug: string }) {
   const [data, setData] = useState<MarketDetailDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,41 +31,42 @@ export function MarketDetail({ slug }: { slug: string }) {
     return () => clearInterval(t);
   }, [load]);
 
-  if (error) return <p className="text-sm text-red-400">Error: {error}</p>;
-  if (!data) return <p className="text-sm text-panel-muted">Loading…</p>;
+  if (error) return <p className="text-sm text-status-error">Error: {error}</p>;
+  if (!data) return <p className="text-sm text-refx-meta">Loading…</p>;
 
   const { view, books, history } = data;
   const arb = view.arb;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pr-2">
       <div>
-        <div className="mb-1 flex flex-wrap items-center gap-2">
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          {view.flags.diverge && <FlagChip kind="DIVERGE" />}
           {view.flags.arb && <FlagChip kind="ARB" />}
           {view.flags.wide && <FlagChip kind="WIDE" />}
-          {view.flags.diverge && <FlagChip kind="DIVERGE" />}
           {view.negRisk && (
-            <span className="rounded border border-panel-border px-1.5 py-0.5 text-[10px] uppercase text-panel-muted">
+            <span className="eyebrow rounded border border-refx-soft px-1.5 py-0.5">
               neg-risk
             </span>
           )}
         </div>
-        <h2 className="text-lg font-semibold leading-tight">{view.question}</h2>
-        <p className="mt-1 text-sm text-panel-muted tabular">
-          implied {pct(view.impliedProb)} · spread {cents(view.spread)} · 24h
-          vol {usd(view.volume24h)}
+        <h2 className="text-lg font-semibold leading-tight text-refx-text2">
+          {view.question}
+        </h2>
+        <p className="mt-1.5 text-sm text-refx-muted tabular">
+          implied <span className="text-refx-text">{pct(view.impliedProb)}</span>{" "}
+          · spread {cents(view.spread)} · 24h vol {usd(view.volume24h)}
         </p>
       </div>
 
-      {/* Order books */}
+      {/* Order books — compact two-column readout */}
       <div className="grid gap-3 sm:grid-cols-2">
         {books.map((b) => (
-          <div
-            key={b.tokenId}
-            className="rounded-lg border border-panel-border bg-panel-surface p-3"
-          >
-            <div className="mb-2 text-sm font-semibold">{b.outcome}</div>
-            <div className="grid grid-cols-2 gap-2 text-sm tabular">
+          <GlassPanel key={b.tokenId} className="p-3">
+            <div className="mb-2 text-sm font-semibold text-refx-text2">
+              {b.outcome}
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm tabular">
               <Stat label="best bid" value={cents(b.bestBid)} />
               <Stat label="best ask" value={cents(b.bestAsk)} />
               <Stat label="bid depth" value={usd(b.bidDepth)} />
@@ -71,45 +74,39 @@ export function MarketDetail({ slug }: { slug: string }) {
               <Stat label="mid" value={pct(b.mid)} />
               <Stat label="spread" value={cents(b.spread)} />
             </div>
-          </div>
+            <div className="mt-2 truncate font-mono text-[10px] text-refx-meta/70">
+              {b.tokenId}
+            </div>
+          </GlassPanel>
         ))}
       </div>
 
-      {/* Arbitrage readout — always gross, with caveats */}
+      {/* Arbitrage — always gross, caveats inline (never hidden) */}
       {view.isBinary && (
-        <div className="rounded-lg border border-panel-border bg-panel-surface p-3">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-panel-muted">
-            Binary arbitrage
-          </div>
+        <GlassPanel className="p-3" accent={!!arb?.type}>
+          <Eyebrow className="mb-1.5">Binary arbitrage</Eyebrow>
           {arb && arb.type ? (
-            <p className="text-sm tabular">
-              <span className="font-semibold text-flag-arb">
-                {arb.type} both legs
-              </span>{" "}
-              · gross{" "}
-              <span className="font-semibold">{cents(arb.perShare)}</span>/pair ·
-              depth cap{" "}
-              <span className="font-semibold">{usd(arb.capacity)}</span> pairs ·
-              gross notional{" "}
-              <span className="font-semibold">{usd(arb.notional)}</span>
+            <p className="text-sm tabular text-refx-muted">
+              <span className="font-semibold text-flagc-arb">{arb.type} both legs</span>
+              {" · "}gross <span className="font-semibold text-refx-text">{cents(arb.perShare)}</span>/pair
+              {" · "}depth cap <span className="font-semibold text-refx-text">{usd(arb.capacity)}</span> pairs
+              {" · "}gross notional <span className="font-semibold text-refx-text">{usd(arb.notional)}</span>
             </p>
           ) : (
-            <p className="text-sm text-panel-muted">No arbitrage at current book.</p>
+            <p className="text-sm text-refx-meta">No arbitrage at current book.</p>
           )}
-          <p className="mt-1 text-[11px] text-panel-muted">
-            Gross figures, before fees and slippage; capped by resting depth shown
-            above. Not a guarantee of fillable profit.
+          <p className="mt-1.5 rounded-refx-sm border border-flagc-arb/20 bg-flagc-arb/5 px-2 py-1.5 text-[11px] leading-snug text-refx-muted">
+            Gross figures, before fees and slippage; capped by the resting depth
+            shown above. Not a guarantee of fillable profit.
           </p>
-        </div>
+        </GlassPanel>
       )}
 
       {/* Probability history */}
-      <div className="rounded-lg border border-panel-border bg-panel-surface p-3">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-panel-muted">
-          Implied probability over time
-        </div>
+      <GlassPanel className="p-3">
+        <Eyebrow className="mb-2">Implied probability over time</Eyebrow>
         <ProbChart series={history} />
-      </div>
+      </GlassPanel>
 
       <EstimateEditor view={view} onChange={load} />
     </div>
@@ -119,8 +116,8 @@ export function MarketDetail({ slug }: { slug: string }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-panel-muted">{label}</span>
-      <span>{value}</span>
+      <span className="eyebrow">{label}</span>
+      <span className="text-refx-text">{value}</span>
     </div>
   );
 }

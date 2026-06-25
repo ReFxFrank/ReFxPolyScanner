@@ -1,9 +1,9 @@
 "use client";
 
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -11,20 +11,21 @@ import {
 } from "recharts";
 import type { HistorySeriesDTO } from "@/lib/api-types";
 
-const COLORS = ["#22c55e", "#a855f7", "#38bdf8", "#f59e0b", "#f472b6"];
+// ReFx-blue series with a soft area gradient fading to transparent; sparse
+// low-opacity grid; glass tooltip with tabular numbers. Secondary series use
+// the quieter accent blue so the primary line keeps the glow/weight.
+const SERIES_COLORS = ["#0072ff", "#58a7d3", "#7db7ff", "#9dccff", "#f5b14c"];
 
-// Implied-probability-over-time from prob_history. One line per outcome token.
 export function ProbChart({ series }: { series: HistorySeriesDTO[] }) {
   const withData = series.filter((s) => s.points.length > 0);
   if (withData.length === 0) {
     return (
-      <div className="flex h-56 items-center justify-center text-sm text-panel-muted">
+      <div className="flex h-56 items-center justify-center text-sm text-refx-meta">
         No history yet — the chart fills in as the poller runs.
       </div>
     );
   }
 
-  // Merge all series onto a shared timestamp axis.
   const tsSet = new Set<number>();
   for (const s of withData) for (const p of s.points) tsSet.add(p.ts);
   const tsList = Array.from(tsSet).sort((a, b) => a - b);
@@ -50,49 +51,71 @@ export function ProbChart({ series }: { series: HistorySeriesDTO[] }) {
 
   return (
     <ResponsiveContainer width="100%" height={240}>
-      <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -8 }}>
-        <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" />
+      <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -8 }}>
+        <defs>
+          {withData.map((s, i) => (
+            <linearGradient key={s.tokenId} id={`grad-${s.tokenId}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={SERIES_COLORS[i % SERIES_COLORS.length]} stopOpacity={0.28} />
+              <stop offset="100%" stopColor={SERIES_COLORS[i % SERIES_COLORS.length]} stopOpacity={0} />
+            </linearGradient>
+          ))}
+        </defs>
+        <CartesianGrid stroke="var(--refx-grid)" strokeDasharray="2 4" vertical={false} />
         <XAxis
           dataKey="ts"
           tickFormatter={fmtTime}
-          stroke="#8b98a9"
-          fontSize={11}
+          stroke="var(--refx-label)"
+          tick={{ fill: "var(--refx-label)", fontSize: 11 }}
+          tickLine={false}
+          axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
           minTickGap={40}
         />
         <YAxis
           domain={[0, 100]}
-          stroke="#8b98a9"
-          fontSize={11}
+          stroke="var(--refx-label)"
+          tick={{ fill: "var(--refx-label)", fontSize: 11 }}
+          tickLine={false}
+          axisLine={false}
           tickFormatter={(v) => `${v}%`}
           width={42}
         />
         <Tooltip
+          cursor={{ stroke: "rgba(0,114,255,0.5)", strokeDasharray: "3 3" }}
           contentStyle={{
-            background: "#121821",
-            border: "1px solid #1f2937",
-            borderRadius: 8,
+            background: "rgba(10,18,32,0.92)",
+            border: "1px solid rgba(0,114,255,0.22)",
+            borderRadius: 10,
             fontSize: 12,
+            backdropFilter: "blur(6px)",
+            boxShadow: "0 8px 28px -10px rgba(0,114,255,0.35)",
           }}
+          labelStyle={{ color: "var(--refx-label)" }}
+          itemStyle={{ fontVariantNumeric: "tabular-nums" }}
           labelFormatter={(ts) => new Date(ts as number).toLocaleString()}
           formatter={(v: number, name) => {
             const s = withData.find((x) => x.tokenId === name);
             return [`${v.toFixed(1)}%`, s?.outcome ?? name];
           }}
         />
-        {withData.map((s, i) => (
-          <Line
-            key={s.tokenId}
-            type="monotone"
-            dataKey={s.tokenId}
-            name={s.tokenId}
-            stroke={COLORS[i % COLORS.length]}
-            dot={false}
-            strokeWidth={2}
-            connectNulls
-            isAnimationActive={false}
-          />
-        ))}
-      </LineChart>
+        {withData.map((s, i) => {
+          const color = SERIES_COLORS[i % SERIES_COLORS.length];
+          return (
+            <Area
+              key={s.tokenId}
+              type="monotone"
+              dataKey={s.tokenId}
+              name={s.tokenId}
+              stroke={color}
+              strokeWidth={i === 0 ? 2.2 : 1.6}
+              fill={`url(#grad-${s.tokenId})`}
+              dot={false}
+              connectNulls
+              isAnimationActive={false}
+              style={i === 0 ? { filter: "drop-shadow(0 0 6px rgba(0,114,255,0.45))" } : undefined}
+            />
+          );
+        })}
+      </AreaChart>
     </ResponsiveContainer>
   );
 }
