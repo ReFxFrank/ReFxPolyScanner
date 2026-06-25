@@ -1,0 +1,37 @@
+{
+  "name": "refx-polypanel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read-only Polymarket research dashboard (web panel)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && npm run build:worker",
+    "build:worker": "tsc -p tsconfig.worker.json",
+    "start": "next start",
+    "worker": "node dist/worker.js",
+    "worker:dev": "tsx watch src/worker.ts",
+    "test": "tsx test/engine.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.7",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

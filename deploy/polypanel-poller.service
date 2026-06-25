@@ -1,0 +1,29 @@
+# /etc/systemd/system/polypanel-poller.service
+# The sole process that talks to Polymarket (public, read-only). Writes the
+# SQLite cache that the web service reads.
+[Unit]
+Description=PolyPanel poller
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/polypanel
+EnvironmentFile=-/etc/polypanel/polypanel.env
+Environment=NODE_ENV=production
+Environment=DATA_DIR=/var/lib/polypanel
+Environment=POLL_INTERVAL=25
+Environment=MARKET_LIMIT=50
+ExecStart=/usr/bin/node dist/worker.js
+Restart=on-failure
+RestartSec=10
+User=polypanel
+Group=polypanel
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/polypanel
+
+[Install]
+WantedBy=multi-user.target

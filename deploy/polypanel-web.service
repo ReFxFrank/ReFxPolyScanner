@@ -1,0 +1,29 @@
+# /etc/systemd/system/polypanel-web.service
+# Next.js web server (UI + API route handlers). Reads the SQLite cache only.
+[Unit]
+Description=PolyPanel web
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/polypanel
+# Load non-secret + secret config (AUTH_PASSWORD) from an env file not in git.
+EnvironmentFile=-/etc/polypanel/polypanel.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=DATA_DIR=/var/lib/polypanel
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+User=polypanel
+Group=polypanel
+
+# Hardening — read-only panel, so lock it down.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/polypanel
+
+[Install]
+WantedBy=multi-user.target
