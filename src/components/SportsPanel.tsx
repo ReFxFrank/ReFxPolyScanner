@@ -25,7 +25,7 @@ export function SportsPanel({ slug }: { slug: string }) {
   }, [slug]);
 
   if (!data || !data.available || !data.team) return null;
-  const { team, match, recent, standings } = data;
+  const { team, match, h2h, recent, standings } = data;
 
   return (
     <GlassPanel className="p-3.5">
@@ -56,6 +56,33 @@ export function SportsPanel({ slug }: { slug: string }) {
       {match && (match.date || match.venue) && (
         <div className="mt-2 text-center text-[11px] text-refx-meta">
           {[match.date, match.venue, match.league].filter(Boolean).join(" · ")}
+        </div>
+      )}
+
+      {/* True head-to-head — real past meetings of the two teams */}
+      {h2h && h2h.games.length > 0 && (
+        <div className="mt-3.5">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="eyebrow">Head-to-head</span>
+            <span className="text-[11px] text-refx-meta">
+              {h2h.teamA}{" "}
+              <span className="tabular text-refx-text">
+                {h2h.record.w}-{h2h.record.d}-{h2h.record.l}
+              </span>{" "}
+              {h2h.teamB} <span className="text-refx-meta">(W-D-L)</span>
+            </span>
+          </div>
+          <ul className="space-y-1">
+            {h2h.games.map((g, i) => (
+              <li key={i} className="flex items-center justify-between gap-3 text-[13px]">
+                <span className="truncate text-refx-muted">
+                  {g.date ? `${g.date} · ` : ""}
+                  {g.event}
+                </span>
+                <span className="shrink-0 tabular text-refx-text">{g.score ?? "—"}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

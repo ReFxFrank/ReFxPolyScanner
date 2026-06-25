@@ -53,6 +53,18 @@ export interface Standings {
   group: string | null;
   rows: StandingRow[];
 }
+export interface H2HGame {
+  date: string | null;
+  event: string;
+  score: string | null;
+}
+export interface H2HRecord {
+  teamA: string;
+  teamB: string;
+  /** From teamA's perspective. */
+  record: { w: number; d: number; l: number };
+  games: H2HGame[];
+}
 export interface SportsInfo {
   available: boolean;
   team?: {
@@ -64,8 +76,49 @@ export interface SportsInfo {
     blurb: string | null;
   };
   match?: MatchInfo | null;
+  h2h?: H2HRecord | null;
   recent?: RecentGame[];
   standings?: Standings | null;
+}
+
+/** Build a head-to-head record for two teams from a pool of past events. */
+function summarizeH2H(
+  teamId: string,
+  teamName: string,
+  oppId: string,
+  oppName: string,
+  events: Row[]
+): H2HRecord | null {
+  const seen = new Set<string>();
+  const games: H2HGame[] = [];
+  let w = 0;
+  let d = 0;
+  let l = 0;
+  for (const e of events) {
+    const ids = [e.idHomeTeam, e.idAwayTeam];
+    if (!ids.includes(teamId) || !ids.includes(oppId)) continue;
+    if (e.intHomeScore == null || e.intAwayScore == null) continue;
+    const key = e.idEvent ?? `${e.strEvent}-${e.dateEvent}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const hs = Number(e.intHomeScore);
+    const as = Number(e.intAwayScore);
+    if (!Number.isFinite(hs) || !Number.isFinite(as)) continue;
+    const teamHome = e.idHomeTeam === teamId;
+    const ts = teamHome ? hs : as;
+    const os = teamHome ? as : hs;
+    if (ts > os) w++;
+    else if (ts < os) l++;
+    else d++;
+    games.push({
+      date: e.dateEvent ?? null,
+      event: e.strEvent ?? `${teamName} vs ${oppName}`,
+      score: `${hs}–${as}`,
+    });
+  }
+  if (games.length === 0) return null;
+  games.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  return { teamA: teamName, teamB: oppName, record: { w, d, l }, games: games.slice(0, 6) };
 }
 
 export function extractTeamName(question: string): string | null {
@@ -186,6 +239,9 @@ async function fetchTeam(name: string): Promise<SportsInfo> {
   let season: string | null = null;
   let idLeague = team.idLeague ?? null;
 
+  let oppId: string | null = null;
+  let oppName = "";
+
   // Upcoming match → head-to-head (both teams).
   try {
     const next = (await getJson(`${BASE}/eventsnext.php?id=${team.idTeam}`)) as {
@@ -197,6 +253,9 @@ async function fetchTeam(name: string): Promise<SportsInfo> {
       involved.add(e.idAwayTeam);
       season = e.strSeason ?? season;
       idLeague = e.idLeague ?? idLeague;
+      oppId = e.idHomeTeam === team.idTeam ? e.idAwayTeam : e.idHomeTeam;
+      oppName =
+        (e.idHomeTeam === team.idTeam ? e.strAwayTeam : e.strHomeTeam) ?? "";
       info.match = {
         date: e.dateEvent ?? null,
         venue: e.strVenue ?? null,
@@ -209,12 +268,14 @@ async function fetchTeam(name: string): Promise<SportsInfo> {
     /* no upcoming match */
   }
 
-  // Recent results for the primary team.
+  // Recent results for the primary team (raw rows reused for the H2H scan).
+  let primaryLast: Row[] = [];
   try {
     const last = (await getJson(`${BASE}/eventslast.php?id=${team.idTeam}`)) as {
       results?: Row[] | null;
     };
-    info.recent = (last.results ?? []).slice(0, 5).map((e) => ({
+    primaryLast = last.results ?? [];
+    info.recent = primaryLast.slice(0, 5).map((e) => ({
       date: e.dateEvent ?? null,
       event: e.strEvent ?? "",
       score:
@@ -224,6 +285,38 @@ async function fetchTeam(name: string): Promise<SportsInfo> {
     }));
   } catch {
     /* no recent games */
+  }
+
+  // True head-to-head: real past meetings of the two teams, gathered from both
+  // teams' recent results and the league season, deduped. Best-effort on the
+  // free tier (recent + current season) — empty when they haven't met.
+  if (oppId && info.match) {
+    const candidates: Row[] = [...primaryLast];
+    try {
+      const oppLast = (await getJson(`${BASE}/eventslast.php?id=${oppId}`)) as {
+        results?: Row[] | null;
+      };
+      candidates.push(...(oppLast.results ?? []));
+    } catch {
+      /* ignore */
+    }
+    if (idLeague) {
+      try {
+        const seasonEv = (await getJson(
+          `${BASE}/eventsseason.php?id=${idLeague}${season ? `&s=${season}` : ""}`
+        )) as { events?: Row[] | null };
+        candidates.push(...(seasonEv.events ?? []));
+      } catch {
+        /* ignore */
+      }
+    }
+    info.h2h = summarizeH2H(
+      team.idTeam,
+      info.team!.name,
+      oppId,
+      oppName,
+      candidates
+    );
   }
 
   // Standings (group/league) — also supplies form + badges for the H2H teams.
@@ -251,7 +344,7 @@ export async function getSportsInfo(question: string): Promise<SportsInfo> {
   const name = extractTeamName(question);
   if (!name) return { available: false };
 
-  const key = `team:v2:${name.toLowerCase()}`;
+  const key = `team:v3:${name.toLowerCase()}`;
   const now = Date.now();
   const cached = getSportsCache(key);
   if (cached) {

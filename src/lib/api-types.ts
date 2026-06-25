@@ -113,6 +113,12 @@ export interface SportsDTO {
     blurb: string | null;
   };
   match?: MatchDTO | null;
+  h2h?: {
+    teamA: string;
+    teamB: string;
+    record: { w: number; d: number; l: number };
+    games: { date: string | null; event: string; score: string | null }[];
+  } | null;
   recent?: { date: string | null; event: string; score: string | null }[];
   standings?: {
     league: string | null;
