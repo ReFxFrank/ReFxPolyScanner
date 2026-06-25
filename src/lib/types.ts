@@ -57,4 +57,6 @@ export interface GammaMarket {
   negRisk: boolean;
   volume: number;
   volume24h: number;
+  /** Category tag slugs this market matched (e.g. politics/sports/business). */
+  categories: string[];
 }

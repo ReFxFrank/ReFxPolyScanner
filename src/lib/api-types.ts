@@ -9,6 +9,7 @@ export interface MarketViewDTO {
   volume: number;
   volume24h: number;
   updatedAt: number;
+  categories: string[];
   impliedProb: number | null;
   spread: number | null;
   flags: { arb: boolean; wide: boolean; diverge: boolean };
@@ -29,6 +30,7 @@ export interface HealthDTO {
   consecutiveErrors: number;
   lastError: string | null;
   marketCount: number;
+  categories: string[];
   now: number;
 }
 

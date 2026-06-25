@@ -52,42 +52,122 @@ async function apiFetch(url: string, opts: FetchOpts = {}): Promise<unknown> {
  * parses the JSON-encoded `clobTokenIds` / `outcomes` string fields and keeps
  * only markets that actually have an order book.
  */
-export async function fetchMarkets(limit: number): Promise<GammaMarket[]> {
-  const params = new URLSearchParams({
-    active: "true",
-    closed: "false",
-    order: "volume24hr",
-    ascending: "false",
-    limit: String(limit),
-  });
-  const raw = await apiFetch(`${GAMMA_BASE}/markets?${params.toString()}`);
-  if (!Array.isArray(raw)) return [];
+export interface CategoryTag {
+  slug: string;
+  id: string;
+}
 
-  const markets: GammaMarket[] = [];
-  for (const m of raw as Array<Record<string, unknown>>) {
-    const slug = typeof m.slug === "string" ? m.slug : null;
-    const question = typeof m.question === "string" ? m.question : null;
-    if (!slug || !question) continue;
+/** Parse one raw Gamma market row into a GammaMarket, or null if unusable. */
+function parseMarketRow(
+  m: Record<string, unknown>,
+  category: string | null
+): GammaMarket | null {
+  const slug = typeof m.slug === "string" ? m.slug : null;
+  const question = typeof m.question === "string" ? m.question : null;
+  if (!slug || !question) return null;
 
-    const tokenIds = parseJsonField<string>(m.clobTokenIds).filter(
-      (t) => typeof t === "string" && t.length > 0
-    );
-    const outcomes = parseJsonField<string>(m.outcomes);
-    if (tokenIds.length === 0) continue; // no book → nothing to analyze
+  const tokenIds = parseJsonField<string>(m.clobTokenIds).filter(
+    (t) => typeof t === "string" && t.length > 0
+  );
+  const outcomes = parseJsonField<string>(m.outcomes);
+  if (tokenIds.length === 0) return null; // no book → nothing to analyze
 
-    markets.push({
-      slug,
-      question,
-      conditionId: typeof m.conditionId === "string" ? m.conditionId : null,
-      tokenIds,
-      outcomes,
-      isBinary: tokenIds.length === 2,
-      negRisk: m.negRisk === true,
-      volume: Number(m.volume) || 0,
-      volume24h: Number(m.volume24hr) || 0,
-    });
+  return {
+    slug,
+    question,
+    conditionId: typeof m.conditionId === "string" ? m.conditionId : null,
+    tokenIds,
+    outcomes,
+    isBinary: tokenIds.length === 2,
+    negRisk: m.negRisk === true,
+    volume: Number(m.volume) || 0,
+    volume24h: Number(m.volume24hr) || 0,
+    categories: category ? [category] : [],
+  };
+}
+
+/**
+ * Resolve category tag slugs (e.g. "politics") to Gamma tag IDs via
+ * `/tags/slug/<slug>`. Slugs that don't resolve are dropped (logged by caller).
+ */
+export async function resolveCategoryTags(
+  slugs: string[]
+): Promise<CategoryTag[]> {
+  const out: CategoryTag[] = [];
+  for (const slug of slugs) {
+    try {
+      const raw = (await apiFetch(`${GAMMA_BASE}/tags/slug/${slug}`)) as
+        | Record<string, unknown>
+        | Array<Record<string, unknown>>;
+      const tag = Array.isArray(raw) ? raw[0] : raw;
+      const id = tag && typeof tag.id === "string" ? tag.id : null;
+      if (id) out.push({ slug, id });
+    } catch {
+      // ignore — a bad slug shouldn't kill discovery
+    }
   }
-  return markets;
+  return out;
+}
+
+/**
+ * Discover the top `limit` active markets ordered by 24h volume. Defensively
+ * parses the JSON-encoded `clobTokenIds` / `outcomes` string fields and keeps
+ * only markets that actually have an order book.
+ *
+ * When `categories` is non-empty, discovery is restricted to those category
+ * tags (one query per category, merged + deduped + re-sorted by 24h volume).
+ * This powers the *approximate* "Polymarket US categories" view — it filters
+ * by market type, NOT by verified per-jurisdiction tradeability.
+ */
+export async function fetchMarkets(
+  limit: number,
+  categories: CategoryTag[] = []
+): Promise<GammaMarket[]> {
+  if (categories.length === 0) {
+    const params = new URLSearchParams({
+      active: "true",
+      closed: "false",
+      order: "volume24hr",
+      ascending: "false",
+      limit: String(limit),
+    });
+    const raw = await apiFetch(`${GAMMA_BASE}/markets?${params.toString()}`);
+    if (!Array.isArray(raw)) return [];
+    return (raw as Array<Record<string, unknown>>)
+      .map((m) => parseMarketRow(m, null))
+      .filter((m): m is GammaMarket => m !== null);
+  }
+
+  // Category mode: one query per tag, then merge by slug (unioning categories).
+  const bySlug = new Map<string, GammaMarket>();
+  for (const cat of categories) {
+    const params = new URLSearchParams({
+      active: "true",
+      closed: "false",
+      order: "volume24hr",
+      ascending: "false",
+      limit: String(limit),
+      tag_id: cat.id,
+    });
+    const raw = await apiFetch(`${GAMMA_BASE}/markets?${params.toString()}`);
+    if (!Array.isArray(raw)) continue;
+    for (const row of raw as Array<Record<string, unknown>>) {
+      const parsed = parseMarketRow(row, cat.slug);
+      if (!parsed) continue;
+      const existing = bySlug.get(parsed.slug);
+      if (existing) {
+        if (!existing.categories.includes(cat.slug)) {
+          existing.categories.push(cat.slug);
+        }
+      } else {
+        bySlug.set(parsed.slug, parsed);
+      }
+    }
+  }
+
+  return Array.from(bySlug.values())
+    .sort((a, b) => b.volume24h - a.volume24h)
+    .slice(0, limit);
 }
 
 /**

@@ -102,6 +102,7 @@ default:
 | `DIVERGE_THRESHOLD` | `0.05` | Abs prob diff that raises a DIVERGE flag. |
 | `ARB_FEE_BUFFER` | `0.01` | Fee/slippage buffer for arb detection ($/share). |
 | `WIDE_SPREAD` | `0.05` | Spread (in $) that raises a WIDE flag. |
+| `MARKET_CATEGORIES` | _(empty)_ | Comma-separated category slugs (e.g. `politics,sports,business`). Empty = all markets. **Approximate** "Polymarket US" view — filters by market *type*, **not** verified NY tradeability. |
 | `AUTH_PASSWORD` | _(unset)_ | Single-user login password. Unset = open (dev only). |
 
 ---

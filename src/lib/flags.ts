@@ -16,6 +16,17 @@ function num(v: string | undefined, dflt: number): number {
   return Number.isFinite(n) && n > 0 ? n : dflt;
 }
 
+/** Parse the stored categories JSON column into a slug array. */
+function parseCategories(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((s) => typeof s === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function toSummary(b: BookRow | undefined): BookSummary | null {
   if (!b) return null;
   return {
@@ -36,6 +47,8 @@ export interface MarketView {
   volume: number;
   volume24h: number;
   updatedAt: number;
+  /** Category slugs this market matched (empty in global mode). */
+  categories: string[];
   /** YES implied probability (the market mid), or null if no book. */
   impliedProb: number | null;
   spread: number | null;
@@ -96,6 +109,7 @@ export function buildMarketView(
     volume: market.volume,
     volume24h: market.volume_24h,
     updatedAt: market.updated_at,
+    categories: parseCategories(market.categories),
     impliedProb,
     spread,
     flags: { arb: arb?.type !== null && arb !== null, wide, diverge },

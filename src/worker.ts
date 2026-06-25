@@ -12,7 +12,13 @@ import {
   fairValueDivergence,
   summarizeBook,
 } from "./lib/engine";
-import { fetchBooks, fetchMarkets, RateLimitError } from "./lib/polymarket";
+import {
+  fetchBooks,
+  fetchMarkets,
+  resolveCategoryTags,
+  RateLimitError,
+  type CategoryTag,
+} from "./lib/polymarket";
 import {
   appendProbHistory,
   getEstimatesBySlug,
@@ -34,6 +40,14 @@ const WIDE_SPREAD = num(process.env.WIDE_SPREAD, 0.05);
 const MAX_BACKOFF_MS = num(process.env.MAX_BACKOFF, 300) * 1000;
 const HISTORY_RETENTION_MS =
   num(process.env.HISTORY_RETENTION_DAYS, 14) * 86_400_000;
+
+// Approximate "Polymarket US" view: restrict discovery to these category tag
+// slugs. Empty = global (all markets). This filters by market TYPE only — it is
+// NOT a verified per-jurisdiction (e.g. New York) tradeability check.
+const MARKET_CATEGORIES = (process.env.MARKET_CATEGORIES ?? "")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
 
 function num(v: string | undefined, dflt: number): number {
   const n = Number(v);
@@ -87,6 +101,9 @@ function analyzeMarket(
     volume: market.volume,
     volume_24h: market.volume24h,
     updated_at: now,
+    categories: market.categories.length
+      ? JSON.stringify(market.categories)
+      : null,
   });
 
   for (const a of analyzed) {
@@ -157,8 +174,11 @@ function analyzeMarket(
   }
 }
 
+// Resolved once at startup (category slugs -> tag IDs). Empty in global mode.
+let categoryTags: CategoryTag[] = [];
+
 async function runCycle(now: number): Promise<number> {
-  const markets = await fetchMarkets(MARKET_LIMIT);
+  const markets = await fetchMarkets(MARKET_LIMIT, categoryTags);
   const allTokens = markets.flatMap((m) => m.tokenIds);
   const books = await fetchBooks(allTokens);
   const estimates = getEstimatesBySlug();
@@ -174,6 +194,24 @@ async function main(): Promise<void> {
   console.log(
     `[poller] starting: interval=${POLL_INTERVAL / 1000}s limit=${MARKET_LIMIT} diverge=${DIVERGE_THRESHOLD} fee=${ARB_FEE_BUFFER}`
   );
+
+  if (MARKET_CATEGORIES.length > 0) {
+    categoryTags = await resolveCategoryTags(MARKET_CATEGORIES);
+    const resolved = categoryTags.map((c) => c.slug);
+    const missing = MARKET_CATEGORIES.filter((s) => !resolved.includes(s));
+    console.log(
+      `[poller] category filter ACTIVE: ${resolved.join(", ") || "(none resolved)"}` +
+        (missing.length ? ` — unresolved: ${missing.join(", ")}` : "")
+    );
+    if (categoryTags.length === 0) {
+      console.warn(
+        "[poller] WARNING: no categories resolved; falling back to GLOBAL discovery"
+      );
+    }
+  } else {
+    console.log("[poller] category filter off (global discovery)");
+  }
+
   let consecutiveErrors = 0;
   let lastPrune = 0;
 

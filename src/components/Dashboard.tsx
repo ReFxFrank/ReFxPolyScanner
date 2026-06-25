@@ -53,6 +53,26 @@ export function Dashboard() {
     <div className="space-y-4">
       <StatusBar health={health} markets={markets} />
 
+      {health && health.categories.length > 0 && (
+        <div className="flex items-start gap-2.5 rounded-refx border border-flagc-arb/30 bg-flagc-arb/[0.06] px-4 py-2.5 text-[12px] leading-snug">
+          <span className="mt-px text-flagc-arb">▲</span>
+          <p className="text-refx-muted">
+            <span className="font-semibold text-flagc-arb">
+              Approximate Polymarket&nbsp;US view
+            </span>{" "}
+            — showing only{" "}
+            <span className="text-refx-text">
+              {health.categories.join(", ")}
+            </span>{" "}
+            markets (the self-certified categories). This filters by{" "}
+            <span className="text-refx-text">market type, not verified New York
+            tradeability</span> — Polymarket&apos;s public API exposes no
+            per-jurisdiction flag, so treat this as a rough proxy, not a
+            guarantee any market is tradeable in NY.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
           <button

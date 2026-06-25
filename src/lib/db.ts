@@ -32,7 +32,8 @@ function migrate(conn: Database.Database): void {
     CREATE TABLE IF NOT EXISTS markets (
       slug TEXT PRIMARY KEY, question TEXT NOT NULL, condition_id TEXT,
       yes_token_id TEXT, no_token_id TEXT, outcomes TEXT, is_binary INTEGER,
-      neg_risk INTEGER, volume REAL, volume_24h REAL, updated_at INTEGER
+      neg_risk INTEGER, volume REAL, volume_24h REAL, updated_at INTEGER,
+      categories TEXT
     );
 
     CREATE TABLE IF NOT EXISTS books (
@@ -67,6 +68,15 @@ function migrate(conn: Database.Database): void {
       consecutive_errors INTEGER DEFAULT 0, last_error TEXT, market_count INTEGER
     );
   `);
+
+  // Idempotent migration for DBs created before the `categories` column existed
+  // (e.g. an already-deployed VPS). ADD COLUMN is a no-op-safe one-liner.
+  const cols = conn
+    .prepare(`PRAGMA table_info(markets)`)
+    .all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === "categories")) {
+    conn.exec(`ALTER TABLE markets ADD COLUMN categories TEXT`);
+  }
 }
 
 export { DATA_DIR };

@@ -76,9 +76,19 @@ export function MarketTable({
               </div>
             </td>
             <td className="px-3 py-2.5">
-              <span className="line-clamp-1 text-refx-muted group-hover:text-refx-text">
-                {m.question}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="line-clamp-1 text-refx-muted group-hover:text-refx-text">
+                  {m.question}
+                </span>
+                {m.categories.map((c) => (
+                  <span
+                    key={c}
+                    className="shrink-0 rounded border border-refx-soft px-1 py-0.5 text-[9px] uppercase tracking-wide text-refx-meta"
+                  >
+                    {c}
+                  </span>
+                ))}
+              </div>
             </td>
           </Row>
         ))}
