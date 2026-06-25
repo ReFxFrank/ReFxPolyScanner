@@ -53,6 +53,12 @@ run_as() { runuser -u "$APP_USER" -- env -C "$APP_DIR" "$@"; }
 # Node changed). Build needs devDeps, so do NOT omit them.
 log "Running 'npm ci' as $APP_USER…"
 run_as npm ci
+# Wipe previous build output first. A changed Next.js build ID can otherwise
+# leave orphaned chunks that the freshly-rendered HTML no longer references,
+# producing browser "chunk 404" client-side exceptions that a cache-clear can't
+# fix (the mismatch is server-side). A clean build dir guarantees consistency.
+log "Cleaning previous build output (.next, dist)…"
+rm -rf "$APP_DIR/.next" "$APP_DIR/dist"
 log "Running 'npm run build' as $APP_USER…"
 run_as npm run build
 [ -f "$APP_DIR/dist/worker.js" ] || die "build did not produce dist/worker.js — not restarting services."
