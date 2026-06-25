@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import { AdminNav } from "@/components/AdminNav";
 
 export const metadata: Metadata = {
   title: "ReFx PolyPanel",
@@ -31,6 +32,7 @@ export default function RootLayout({
             <nav className="flex items-center gap-1 text-sm">
               <NavLink href="/">Dashboard</NavLink>
               <NavLink href="/calls">My Calls</NavLink>
+              <AdminNav />
             </nav>
           </div>
         </header>

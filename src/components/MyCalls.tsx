@@ -7,6 +7,7 @@ import { StatCard } from "./ui/StatCard";
 import { StatusPill } from "./ui/StatusPill";
 import { Button } from "./ui/Controls";
 import { HeaderCell, Row, TableShell, THead } from "./ui/Table";
+import { useSession } from "./useSession";
 
 // "My Calls": your logged estimates with current/resolved status, plus the
 // calibration summary (hit rate + Brier vs the market price at log time).
@@ -14,6 +15,8 @@ import { HeaderCell, Row, TableShell, THead } from "./ui/Table";
 export function MyCalls() {
   const [estimates, setEstimates] = useState<EstimateDTO[]>([]);
   const [backtest, setBacktest] = useState<BacktestDTO | null>(null);
+  const session = useSession();
+  const admin = session?.admin ?? false;
 
   const load = useCallback(async () => {
     const [eRes, bRes] = await Promise.all([
@@ -46,7 +49,19 @@ export function MyCalls() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-base font-semibold text-refx-text2">My Calls</h1>
+      <div className="flex items-center gap-2.5">
+        <h1 className="text-base font-semibold text-refx-text2">
+          {admin ? "My Calls" : "Operator Calls"}
+        </h1>
+        {session && !admin && session.authEnabled && (
+          <span className="rounded-full border border-refx-soft px-2 py-0.5 text-[10px] uppercase tracking-wide text-refx-meta">
+            read-only ·{" "}
+            <a href="/login" className="text-refx-blueText hover:underline">
+              operator sign-in
+            </a>
+          </span>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Resolved" value={backtest ? String(backtest.count) : "—"} />
@@ -79,7 +94,7 @@ export function MyCalls() {
             <HeaderCell className="text-right">Your %</HeaderCell>
             <HeaderCell className="text-right">Mkt @ log</HeaderCell>
             <HeaderCell>Status</HeaderCell>
-            <HeaderCell className="text-right">Actions</HeaderCell>
+            {admin && <HeaderCell className="text-right">Actions</HeaderCell>}
           </THead>
           <tbody>
             {estimates.map((e) => (
@@ -104,38 +119,40 @@ export function MyCalls() {
                     <StatusPill kind="open" />
                   )}
                 </td>
-                <td className="px-3 py-2.5 text-right align-top">
-                  <div className="flex justify-end gap-1.5">
-                    {!e.resolved && (
-                      <>
-                        <button
-                          onClick={() => resolve(e.id, 1)}
-                          className="rounded-refx-sm border border-status-live/25 bg-status-live/10 px-2 py-1 text-xs text-status-live hover:bg-status-live/20"
-                        >
-                          YES
-                        </button>
-                        <button
-                          onClick={() => resolve(e.id, 0)}
-                          className="rounded-refx-sm border border-status-error/25 bg-status-error/10 px-2 py-1 text-xs text-status-error hover:bg-status-error/20"
-                        >
-                          NO
-                        </button>
-                      </>
-                    )}
-                    <Button variant="ghost" onClick={() => remove(e.id)} className="px-2 py-1 text-xs">
-                      ✕
-                    </Button>
-                  </div>
-                </td>
+                {admin && (
+                  <td className="px-3 py-2.5 text-right align-top">
+                    <div className="flex justify-end gap-1.5">
+                      {!e.resolved && (
+                        <>
+                          <button
+                            onClick={() => resolve(e.id, 1)}
+                            className="rounded-refx-sm border border-status-live/25 bg-status-live/10 px-2 py-1 text-xs text-status-live hover:bg-status-live/20"
+                          >
+                            YES
+                          </button>
+                          <button
+                            onClick={() => resolve(e.id, 0)}
+                            className="rounded-refx-sm border border-status-error/25 bg-status-error/10 px-2 py-1 text-xs text-status-error hover:bg-status-error/20"
+                          >
+                            NO
+                          </button>
+                        </>
+                      )}
+                      <Button variant="ghost" onClick={() => remove(e.id)} className="px-2 py-1 text-xs">
+                        ✕
+                      </Button>
+                    </div>
+                  </td>
+                )}
               </Row>
             ))}
           </tbody>
         </TableShell>
       )}
       <p className="text-[11px] leading-relaxed text-refx-meta">
-        Resolution is captured manually (mark YES/NO when a market settles). The
-        backtest scores your calls against the market price you faced at log time
-        — beating that baseline is what &ldquo;edge&rdquo; means here.
+        Resolution is captured manually (the operator marks YES/NO when a market
+        settles). The backtest scores each call against the market price at log
+        time — beating that baseline is what &ldquo;edge&rdquo; means here.
       </p>
     </div>
   );

@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE, expectedToken, safeEqual } from "@/lib/auth";
+import { SESSION_COOKIE, expectedToken, isPublic, safeEqual } from "@/lib/auth";
 
 // Gate every page/API route behind the single-user session, except the login
 // flow and Next internals. No-op when AUTH_PASSWORD is unset.
+//
+// In PUBLIC mode the whole site is readable without logging in — the estimate
+// WRITE routes enforce the operator cookie themselves (see /api/estimates), so
+// the middleware lets everything through.
 export async function middleware(req: NextRequest) {
   const expected = await expectedToken();
   if (!expected) return NextResponse.next(); // auth disabled
+  if (isPublic()) return NextResponse.next(); // public reads; writes self-guard
 
   const token = req.cookies.get(SESSION_COOKIE)?.value ?? "";
   if (token && safeEqual(token, expected)) return NextResponse.next();

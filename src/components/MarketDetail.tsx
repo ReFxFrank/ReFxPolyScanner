@@ -8,12 +8,14 @@ import { ProbChart } from "./ProbChart";
 import { EstimateEditor } from "./EstimateEditor";
 import { GlassPanel } from "./ui/GlassPanel";
 import { Eyebrow } from "./ui/Controls";
+import { useSession } from "./useSession";
 
 // Market detail: full Yes/No book, the binary-arb readout (gross, with depth +
 // fee caveats inline and visible), the probability-over-time chart, the editor.
 export function MarketDetail({ slug }: { slug: string }) {
   const [data, setData] = useState<MarketDetailDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const session = useSession();
 
   const load = useCallback(async () => {
     try {
@@ -108,7 +110,24 @@ export function MarketDetail({ slug }: { slug: string }) {
         <ProbChart series={history} />
       </GlassPanel>
 
-      <EstimateEditor view={view} onChange={load} />
+      {/* Estimate editor is operator-only. Public visitors see the operator's
+          logged call (if any) read-only via the DIVERGE chip + this note. */}
+      {session?.admin ? (
+        <EstimateEditor view={view} onChange={load} />
+      ) : (
+        view.estimate && (
+          <GlassPanel className="p-3">
+            <Eyebrow className="mb-1">Operator estimate</Eyebrow>
+            <p className="text-sm text-refx-muted tabular">
+              operator{" "}
+              <span className="text-refx-text">
+                {pct(view.estimate.yourProb, 0)}
+              </span>{" "}
+              vs market {pct(view.impliedProb, 0)} ({view.estimate.direction})
+            </p>
+          </GlassPanel>
+        )
+      )}
     </div>
   );
 }

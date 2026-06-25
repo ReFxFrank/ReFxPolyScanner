@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteEstimate, resolveEstimate } from "@/lib/store";
+import { SESSION_COOKIE, isValidAdminToken } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// DELETE /api/estimates/:id — remove a logged call.
+async function denyIfNotAdmin(req: NextRequest): Promise<NextResponse | null> {
+  if (await isValidAdminToken(req.cookies.get(SESSION_COOKIE)?.value)) {
+    return null;
+  }
+  return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+}
+
+// DELETE /api/estimates/:id — remove a logged call. Operator-only.
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return denied;
   const { id } = await params;
   const ok = deleteEstimate(Number(id));
   if (!ok) return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -22,6 +32,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return denied;
   const { id } = await params;
   let body: { outcome?: number };
   try {

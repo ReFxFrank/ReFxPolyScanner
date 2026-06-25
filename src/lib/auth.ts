@@ -12,6 +12,26 @@ export function authEnabled(): boolean {
   return !!process.env.AUTH_PASSWORD;
 }
 
+/**
+ * Public mode: reads/pages are open to anyone, but estimate WRITES still
+ * require the operator's session (admin) cookie. Enabled with PUBLIC=true.
+ */
+export function isPublic(): boolean {
+  return process.env.PUBLIC === "true";
+}
+
+/**
+ * Server-side check that a session token grants admin (write) rights. When
+ * auth is disabled entirely, everyone is treated as admin (fully-open mode).
+ */
+export async function isValidAdminToken(
+  token: string | undefined | null
+): Promise<boolean> {
+  const expected = await expectedToken();
+  if (!expected) return true; // no AUTH_PASSWORD → fully open, writes allowed
+  return !!token && safeEqual(token, expected);
+}
+
 /** Compute the opaque session token for a password (Web Crypto; edge-safe). */
 export async function sessionToken(password: string): Promise<string> {
   const data = new TextEncoder().encode(SALT + password);

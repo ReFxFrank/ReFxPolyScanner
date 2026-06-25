@@ -104,6 +104,7 @@ default:
 | `WIDE_SPREAD` | `0.05` | Spread (in $) that raises a WIDE flag. |
 | `MARKET_CATEGORIES` | _(empty)_ | Comma-separated category slugs (e.g. `politics,sports,business`). Empty = all markets. **Approximate** "Polymarket US" view — filters by market *type*, **not** verified NY tradeability. |
 | `AUTH_PASSWORD` | _(unset)_ | Single-user login password. Unset = open (dev only). |
+| `PUBLIC` | _(unset)_ | `true` + `AUTH_PASSWORD` set = public read/scan for anyone, but estimate writes ("My Calls") stay behind the operator password. Unset = whole site private. |
 
 ---
 
