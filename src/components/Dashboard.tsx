@@ -90,11 +90,9 @@ export function Dashboard() {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2 text-sm text-refx-meta">
-          {/* Sort control — mobile only; desktop sorts via table headers. */}
-          <label htmlFor="sort" className="eyebrow md:hidden">sort</label>
+          <label htmlFor="sort" className="eyebrow">sort</label>
           <Select
             id="sort"
-            className="md:hidden"
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
           >
@@ -124,8 +122,6 @@ export function Dashboard() {
       ) : (
         <MarketTable
           markets={markets}
-          sort={sort}
-          onSort={setSort}
           onSelect={setSelected}
           selectedSlug={selected}
         />

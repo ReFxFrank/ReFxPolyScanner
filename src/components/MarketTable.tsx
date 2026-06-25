@@ -3,21 +3,18 @@
 import type { MarketViewDTO } from "@/lib/api-types";
 import { cents, pct, usd } from "@/lib/format";
 import { FlagChip } from "./FlagChip";
-import { HeaderCell, Row, SortHeader, TableShell, THead } from "./ui/Table";
-import { TickValue } from "./ui/TickValue";
 
 export type SortKey = "volume" | "spread" | "implied";
 
+// Responsive card grid: 1 column on phones, 2 on tablet, 3 on wide desktop.
+// Every market shows its full question + big neutral stats, readable at any
+// width. Sorting is driven by the dropdown in the Dashboard toolbar.
 export function MarketTable({
   markets,
-  sort,
-  onSort,
   onSelect,
   selectedSlug,
 }: {
   markets: MarketViewDTO[];
-  sort: SortKey;
-  onSort: (k: SortKey) => void;
   onSelect: (slug: string) => void;
   selectedSlug: string | null;
 }) {
@@ -30,70 +27,16 @@ export function MarketTable({
   }
 
   return (
-    <>
-      {/* Mobile / narrow: readable cards (full question, big neutral stats). */}
-      <div className="space-y-2.5 md:hidden">
-        {markets.map((m) => (
-          <MarketCard
-            key={m.slug}
-            m={m}
-            selected={m.slug === selectedSlug}
-            onSelect={onSelect}
-          />
-        ))}
-      </div>
-
-      {/* Desktop / wide: dense sortable table. */}
-      <div className="hidden md:block">
-        <TableShell>
-          <THead>
-            <SortHeader className="w-24 text-right" active={sort === "implied"} onClick={() => onSort("implied")}>
-              Implied
-            </SortHeader>
-            <SortHeader className="w-20 text-right" active={sort === "spread"} onClick={() => onSort("spread")}>
-              Spread
-            </SortHeader>
-            <SortHeader className="w-24 text-right" active={sort === "volume"} onClick={() => onSort("volume")}>
-              24h Vol
-            </SortHeader>
-            <HeaderCell className="w-44">Flags</HeaderCell>
-            <HeaderCell>Market</HeaderCell>
-          </THead>
-          <tbody>
-            {markets.map((m) => (
-              <Row key={m.slug} selected={m.slug === selectedSlug} onClick={() => onSelect(m.slug)}>
-                {/* Implied % = consensus, rendered as neutral bright data (never
-                    colored/glowed by magnitude). */}
-                <td className="px-3 py-2.5 text-right font-medium tabular text-refx-text">
-                  <TickValue>{pct(m.impliedProb, 1)}</TickValue>
-                </td>
-                <td className="px-3 py-2.5 text-right tabular text-refx-muted">
-                  <TickValue>{cents(m.spread)}</TickValue>
-                </td>
-                <td className="px-3 py-2.5 text-right tabular text-refx-muted">
-                  {usd(m.volume24h)}
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex flex-wrap gap-1">
-                    <MarketFlags m={m} />
-                  </div>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="line-clamp-1 text-refx-muted group-hover:text-refx-text">
-                      {m.question}
-                    </span>
-                    {m.categories.map((c) => (
-                      <CategoryTag key={c} c={c} />
-                    ))}
-                  </div>
-                </td>
-              </Row>
-            ))}
-          </tbody>
-        </TableShell>
-      </div>
-    </>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {markets.map((m) => (
+        <MarketCard
+          key={m.slug}
+          m={m}
+          selected={m.slug === selectedSlug}
+          onSelect={onSelect}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -109,7 +52,7 @@ function MarketCard({
   return (
     <button
       onClick={() => onSelect(m.slug)}
-      className={`block w-full rounded-refx glass p-3.5 text-left transition-transform duration-150 active:scale-[0.99] ${
+      className={`flex h-full w-full flex-col rounded-refx glass p-3.5 text-left transition-transform duration-150 hover:-translate-y-0.5 active:scale-[0.99] ${
         selected ? "border-refx-blue-strong shadow-refx-blue" : ""
       }`}
     >
@@ -121,12 +64,12 @@ function MarketCard({
         <MarketFlags m={m} />
       </div>
 
-      {/* full question — the most important thing, now fully readable */}
+      {/* full question — fully readable, never truncated */}
       <p className="text-[15px] font-medium leading-snug text-refx-text">
         {m.question}
       </p>
 
-      {/* key stats, with labels */}
+      {/* key stats, with labels — implied is the headline, kept neutral */}
       <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/[0.06] pt-2.5">
         <CardStat label="implied" value={pct(m.impliedProb, 1)} emphasize />
         <CardStat label="spread" value={cents(m.spread)} />
