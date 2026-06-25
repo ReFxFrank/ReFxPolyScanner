@@ -21,11 +21,19 @@ export async function POST(req: NextRequest) {
   if (got !== expected) {
     return NextResponse.json({ error: "wrong password" }, { status: 401 });
   }
+  // Mark the cookie Secure only when the request actually arrived over HTTPS
+  // (directly, or via nginx's X-Forwarded-Proto). A Secure cookie set over
+  // plain HTTP is silently dropped by browsers, which would make login loop
+  // back to /login forever. Under TLS we still get Secure; over HTTP it works.
+  const proto =
+    req.headers.get("x-forwarded-proto")?.split(",")[0].trim() ||
+    req.nextUrl.protocol.replace(/:$/, "");
+  const isHttps = proto === "https";
   const res = NextResponse.json({ ok: true });
   res.cookies.set(SESSION_COOKIE, expected, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isHttps,
     path: "/",
     maxAge: 60 * 60 * 24 * 30, // 30 days
   });
