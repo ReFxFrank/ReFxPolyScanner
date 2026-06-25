@@ -126,6 +126,10 @@ export interface SportsDTO {
     group: string | null;
     rows: StandingRowDTO[];
   } | null;
+  topScorers?: {
+    league: string;
+    scorers: { name: string; team: string; goals: number }[];
+  } | null;
 }
 
 export interface BacktestDTO {

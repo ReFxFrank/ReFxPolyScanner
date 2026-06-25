@@ -15,14 +15,18 @@ export async function GET(req: NextRequest) {
   const market = getMarket(slug);
   if (!market) return NextResponse.json({ available: false });
 
-  // If categories are tracked and this clearly isn't sports, skip the lookup.
+  // If categories are tracked and none is a sport, skip the lookup.
+  const SPORT_TAGS = new Set([
+    "sports", "soccer", "tennis", "basketball", "baseball", "football",
+    "mma", "golf", "hockey", "cricket",
+  ]);
   let categories: string[] = [];
   try {
     categories = market.categories ? JSON.parse(market.categories) : [];
   } catch {
     categories = [];
   }
-  if (categories.length > 0 && !categories.includes("sports")) {
+  if (categories.length > 0 && !categories.some((c) => SPORT_TAGS.has(c))) {
     return NextResponse.json({ available: false });
   }
 

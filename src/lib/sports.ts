@@ -6,6 +6,7 @@
 // any miss so the UI just hides the panel.
 
 import { getSportsCache, setSportsCache } from "./store";
+import { apiFootballEnabled, getTopScorers, type TopScorers } from "./apifootball";
 
 const BASE =
   process.env.SPORTSDB_BASE ?? "https://www.thesportsdb.com/api/v1/json/3";
@@ -79,6 +80,7 @@ export interface SportsInfo {
   h2h?: H2HRecord | null;
   recent?: RecentGame[];
   standings?: Standings | null;
+  topScorers?: TopScorers | null;
 }
 
 /** Build a head-to-head record for two teams from a pool of past events. */
@@ -336,6 +338,12 @@ async function fetchTeam(name: string): Promise<SportsInfo> {
     }
   }
 
+  // Optional premium enrichment: real top scorers for soccer competitions.
+  if (apiFootballEnabled() && info.team?.sport === "Soccer") {
+    const hint = info.match?.league ?? info.team?.league ?? null;
+    info.topScorers = await getTopScorers(info.team.name, hint);
+  }
+
   return info;
 }
 
@@ -344,7 +352,7 @@ export async function getSportsInfo(question: string): Promise<SportsInfo> {
   const name = extractTeamName(question);
   if (!name) return { available: false };
 
-  const key = `team:v3:${name.toLowerCase()}`;
+  const key = `team:v4:${name.toLowerCase()}`;
   const now = Date.now();
   const cached = getSportsCache(key);
   if (cached) {

@@ -25,7 +25,7 @@ export function SportsPanel({ slug }: { slug: string }) {
   }, [slug]);
 
   if (!data || !data.available || !data.team) return null;
-  const { team, match, h2h, recent, standings } = data;
+  const { team, match, h2h, recent, standings, topScorers } = data;
 
   return (
     <GlassPanel className="p-3.5">
@@ -139,6 +139,29 @@ export function SportsPanel({ slug }: { slug: string }) {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Top scorers (API-Football, soccer competitions) */}
+      {topScorers && topScorers.scorers.length > 0 && (
+        <div className="mt-3.5">
+          <div className="eyebrow mb-1.5">
+            Top scorers · {topScorers.league}
+          </div>
+          <ul className="space-y-1">
+            {topScorers.scorers.map((p, i) => (
+              <li key={i} className="flex items-center justify-between gap-3 text-[13px]">
+                <span className="truncate text-refx-muted">
+                  <span className="mr-1.5 inline-block w-4 text-right tabular text-refx-meta">
+                    {i + 1}
+                  </span>
+                  <span className="text-refx-text">{p.name}</span>
+                  {p.team && <span className="text-refx-meta"> · {p.team}</span>}
+                </span>
+                <span className="shrink-0 tabular text-refx-text">{p.goals}g</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
