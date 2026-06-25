@@ -76,6 +76,32 @@ export interface SignalDTO {
   ts: number;
 }
 
+export interface SideTeamDTO {
+  name: string;
+  badge: string | null;
+  form: string | null;
+}
+export interface MatchDTO {
+  date: string | null;
+  venue: string | null;
+  league: string | null;
+  home: SideTeamDTO;
+  away: SideTeamDTO;
+}
+export interface StandingRowDTO {
+  rank: number | null;
+  team: string;
+  badge: string | null;
+  played: number | null;
+  win: number | null;
+  draw: number | null;
+  loss: number | null;
+  gd: number | null;
+  points: number | null;
+  form: string | null;
+  group: string | null;
+  highlight: boolean;
+}
 export interface SportsDTO {
   available: boolean;
   team?: {
@@ -86,8 +112,14 @@ export interface SportsDTO {
     badge: string | null;
     blurb: string | null;
   };
+  match?: MatchDTO | null;
   recent?: { date: string | null; event: string; score: string | null }[];
-  next?: { date: string | null; event: string } | null;
+  standings?: {
+    league: string | null;
+    season: string | null;
+    group: string | null;
+    rows: StandingRowDTO[];
+  } | null;
 }
 
 export interface BacktestDTO {

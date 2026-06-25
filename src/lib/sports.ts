@@ -1,23 +1,58 @@
 // ── Sports enrichment (TheSportsDB) ───────────────────────────────────────
-// Best-effort team stats for sports markets: pull the team named in the
-// question (e.g. "Will Germany win …" → Germany) and show badge, league,
-// recent form, and next match. Fetched server-side and cached in SQLite so the
-// free third-party API is hit rarely. Never throws — returns { available:false }
-// on any miss so the UI just hides the panel.
+// Best-effort team context for sports markets: the team named in the question,
+// its upcoming match (head-to-head with the opponent), recent results, and the
+// group/league standings. Fetched server-side, cached in SQLite so the free
+// third-party API is hit rarely. Never throws — returns { available:false } on
+// any miss so the UI just hides the panel.
 
 import { getSportsCache, setSportsCache } from "./store";
 
 const BASE =
   process.env.SPORTSDB_BASE ?? "https://www.thesportsdb.com/api/v1/json/3";
 const TTL_OK = 6 * 3600_000; // 6h for a hit
-const TTL_MISS = 60 * 60_000; // 1h for a miss (avoid refetch storms)
+const TTL_MISS = 60 * 60_000; // 1h for a miss
 
 export interface RecentGame {
   date: string | null;
   event: string;
   score: string | null;
 }
-
+export interface SideTeam {
+  name: string;
+  badge: string | null;
+  /** Recent form string like "WWDLW" (most recent last), if known. */
+  form: string | null;
+}
+export interface MatchInfo {
+  date: string | null;
+  venue: string | null;
+  league: string | null;
+  home: SideTeam;
+  away: SideTeam;
+}
+export interface StandingRow {
+  rank: number | null;
+  team: string;
+  badge: string | null;
+  played: number | null;
+  win: number | null;
+  draw: number | null;
+  loss: number | null;
+  gd: number | null;
+  points: number | null;
+  /** Recent form string like "WWDLW" (most recent last), if known. */
+  form: string | null;
+  /** Group label (e.g. "E") when the table spans multiple groups. */
+  group: string | null;
+  /** True for the team(s) this market is about. */
+  highlight: boolean;
+}
+export interface Standings {
+  league: string | null;
+  season: string | null;
+  group: string | null;
+  rows: StandingRow[];
+}
 export interface SportsInfo {
   available: boolean;
   team?: {
@@ -28,15 +63,11 @@ export interface SportsInfo {
     badge: string | null;
     blurb: string | null;
   };
+  match?: MatchInfo | null;
   recent?: RecentGame[];
-  next?: { date: string | null; event: string } | null;
+  standings?: Standings | null;
 }
 
-/**
- * Pull the competitor named in a "Will <X> win …" style question. Returns null
- * when the question isn't a team-win market (so we don't show a sports panel on
- * political/other markets).
- */
 export function extractTeamName(question: string): string | null {
   const m = question.match(
     /\bwill\s+(.+?)\s+(?:win|beat|defeat|reach|advance|qualify|make)\b/i
@@ -44,10 +75,15 @@ export function extractTeamName(question: string): string | null {
   if (!m) return null;
   const name = m[1].trim().replace(/^the\s+/i, "").trim();
   if (name.length < 2 || name.length > 40) return null;
-  // Reject obvious non-teams (dates, pure numbers).
   if (/^\d+$/.test(name)) return null;
   return name;
 }
+
+const num = (v: unknown): number | null => {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 
 async function getJson(url: string, timeoutMs = 12000): Promise<unknown> {
   const ctrl = new AbortController();
@@ -61,10 +97,71 @@ async function getJson(url: string, timeoutMs = 12000): Promise<unknown> {
   }
 }
 
+type Row = Record<string, string>;
+
+async function fetchStandings(
+  idLeague: string,
+  season: string | null,
+  involvedIds: Set<string>
+): Promise<Standings | null> {
+  const seasons = [season, "2026", "2025-2026", "2024", "2023"].filter(
+    (s): s is string => !!s
+  );
+  for (const s of seasons) {
+    let table: Row[] | null = null;
+    try {
+      const r = (await getJson(`${BASE}/lookuptable.php?l=${idLeague}&s=${s}`)) as {
+        table?: Row[] | null;
+      };
+      table = r.table ?? null;
+    } catch {
+      table = null;
+    }
+    if (!table || table.length === 0) continue;
+
+    // Prefer the group(s) containing the involved team(s); fall back to the
+    // whole table when that group is too sparse (e.g. a future tournament).
+    const groups = new Set<string>();
+    for (const row of table) {
+      if (row.idTeam && involvedIds.has(row.idTeam) && row.strGroup) {
+        groups.add(row.strGroup);
+      }
+    }
+    const grouped = groups.size
+      ? table.filter((row) => row.strGroup && groups.has(row.strGroup))
+      : [];
+    const base = grouped.length >= 2 ? grouped : table;
+    if (base.length < 2) continue; // nothing meaningful to show
+
+    const rows: StandingRow[] = base.slice(0, 10).map((row) => ({
+      rank: num(row.intRank),
+      team: row.strTeam ?? "",
+      badge: row.strBadge ?? null,
+      played: num(row.intPlayed),
+      win: num(row.intWin),
+      draw: num(row.intDraw),
+      loss: num(row.intLoss),
+      gd: num(row.intGoalDifference),
+      points: num(row.intPoints),
+      form: row.strForm || null,
+      group: row.strGroup || null,
+      highlight: !!row.idTeam && involvedIds.has(row.idTeam),
+    }));
+    const distinct = new Set(rows.map((r) => r.group).filter(Boolean));
+    return {
+      league: base[0]?.strLeague ?? null,
+      season: s,
+      group: distinct.size === 1 ? [...distinct][0] : null,
+      rows,
+    };
+  }
+  return null;
+}
+
 async function fetchTeam(name: string): Promise<SportsInfo> {
   const search = (await getJson(
     `${BASE}/searchteams.php?t=${encodeURIComponent(name)}`
-  )) as { teams?: Array<Record<string, string>> | null };
+  )) as { teams?: Row[] | null };
   const team = search.teams?.[0];
   if (!team?.idTeam) return { available: false };
 
@@ -77,17 +174,45 @@ async function fetchTeam(name: string): Promise<SportsInfo> {
       country: team.strCountry ?? null,
       badge: team.strBadge ?? null,
       blurb: team.strDescriptionEN
-        ? team.strDescriptionEN.slice(0, 220).replace(/\s+\S*$/, "") + "…"
+        ? team.strDescriptionEN.slice(0, 200).replace(/\s+\S*$/, "") + "…"
         : null,
     },
+    match: null,
     recent: [],
-    next: null,
+    standings: null,
   };
 
-  // Recent results + next fixture are nice-to-have; ignore their failures.
+  const involved = new Set<string>([team.idTeam]);
+  let season: string | null = null;
+  let idLeague = team.idLeague ?? null;
+
+  // Upcoming match → head-to-head (both teams).
+  try {
+    const next = (await getJson(`${BASE}/eventsnext.php?id=${team.idTeam}`)) as {
+      events?: Row[] | null;
+    };
+    const e = next.events?.[0];
+    if (e?.idHomeTeam && e?.idAwayTeam) {
+      involved.add(e.idHomeTeam);
+      involved.add(e.idAwayTeam);
+      season = e.strSeason ?? season;
+      idLeague = e.idLeague ?? idLeague;
+      info.match = {
+        date: e.dateEvent ?? null,
+        venue: e.strVenue ?? null,
+        league: e.strLeague ?? null,
+        home: { name: e.strHomeTeam ?? "Home", badge: null, form: null },
+        away: { name: e.strAwayTeam ?? "Away", badge: null, form: null },
+      };
+    }
+  } catch {
+    /* no upcoming match */
+  }
+
+  // Recent results for the primary team.
   try {
     const last = (await getJson(`${BASE}/eventslast.php?id=${team.idTeam}`)) as {
-      results?: Array<Record<string, string>> | null;
+      results?: Row[] | null;
     };
     info.recent = (last.results ?? []).slice(0, 5).map((e) => ({
       date: e.dateEvent ?? null,
@@ -100,15 +225,24 @@ async function fetchTeam(name: string): Promise<SportsInfo> {
   } catch {
     /* no recent games */
   }
-  try {
-    const next = (await getJson(`${BASE}/eventsnext.php?id=${team.idTeam}`)) as {
-      events?: Array<Record<string, string>> | null;
-    };
-    const n = next.events?.[0];
-    if (n) info.next = { date: n.dateEvent ?? null, event: n.strEvent ?? "" };
-  } catch {
-    /* no upcoming game */
+
+  // Standings (group/league) — also supplies form + badges for the H2H teams.
+  if (idLeague) {
+    info.standings = await fetchStandings(idLeague, season, involved);
+    if (info.standings && info.match) {
+      const byName = new Map(
+        info.standings.rows.map((r) => [r.team.toLowerCase(), r])
+      );
+      for (const side of [info.match.home, info.match.away]) {
+        const r = byName.get(side.name.toLowerCase());
+        if (r) {
+          side.badge = r.badge;
+          side.form = r.form;
+        }
+      }
+    }
   }
+
   return info;
 }
 
@@ -117,7 +251,7 @@ export async function getSportsInfo(question: string): Promise<SportsInfo> {
   const name = extractTeamName(question);
   if (!name) return { available: false };
 
-  const key = `team:${name.toLowerCase()}`;
+  const key = `team:v2:${name.toLowerCase()}`;
   const now = Date.now();
   const cached = getSportsCache(key);
   if (cached) {
