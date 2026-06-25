@@ -120,7 +120,30 @@ default:
 
 ---
 
-## Deployment (Ubuntu VPS)
+## Deployment
+
+Two supported paths — full runbook in [`deploy/DEPLOY.md`](deploy/DEPLOY.md).
+
+**Docker / Compose (portable, any host):**
+
+```bash
+cp .env.docker.example .env     # set a strong AUTH_PASSWORD
+docker compose build && docker compose up -d           # web (127.0.0.1:3000) + poller
+docker compose --profile tls up -d                     # optional: + Caddy auto-TLS
+```
+
+**Bare-metal Ubuntu VPS (one command, idempotent):**
+
+```bash
+sudo ./deploy/install.sh                                       # HTTP only
+sudo DOMAIN=panel.example.com ACME_EMAIL=you@example.com ./deploy/install.sh  # + TLS
+```
+
+The installer creates the `polypanel` user, builds the app, writes a random
+`AUTH_PASSWORD`, installs both systemd units, and wires up nginx + certbot.
+`deploy/update.sh` and `deploy/backup.sh` handle updates and WAL-safe backups.
+
+### Manual VPS setup (what the installer automates)
 
 Prereqs: Ubuntu 22.04/24.04, a domain pointed at the VPS, Node 20+ LTS, nginx,
 certbot.

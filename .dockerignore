@@ -1,0 +1,37 @@
+# Keep the build context small and the image reproducible. Anything generated,
+# local, or secret stays out — the image builds these fresh inside the stage.
+
+# Dependencies / build output (recompiled & rebuilt in the build stage)
+node_modules
+.next
+out
+dist
+*.tsbuildinfo
+next-env.d.ts
+
+# Local data — the SQLite DB belongs in a volume, never in the image
+data
+*.db
+*.db-wal
+*.db-shm
+
+# Secrets / env — NEVER bake into the image
+.env
+.env.local
+.env.*.local
+
+# VCS / CI / editor / OS noise
+.git
+.gitignore
+.github
+.vscode
+.idea
+.DS_Store
+npm-debug.log*
+
+# Docker artifacts themselves
+Dockerfile
+.dockerignore
+
+# Docs that don't affect the build
+README.md

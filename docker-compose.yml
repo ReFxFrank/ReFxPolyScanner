@@ -1,0 +1,88 @@
+# PolyPanel — two services from ONE locally-built image.
+#
+# The image bundles the Next.js build + the compiled poller (dist/worker.js).
+# Its entrypoint dispatches on the command word:
+#   web    -> npm run start   (Next.js on PORT 3000, READS the SQLite cache)
+#   worker -> node dist/worker.js (the sole writer; talks to Polymarket)
+#
+# Both processes share ONE SQLite file (WAL mode) on the `data` named volume,
+# mounted at /data. better-sqlite3's WAL requires a LOCAL filesystem — keep this
+# volume on local disk (the default `local` driver). Do NOT back it with NFS /
+# CIFS / a network share: WAL locking is broken there and the DB will corrupt.
+#
+# Concurrency contract: the poller is the only writer, the web app only reads.
+# WAL lets the single writer and the reader coexist without blocking.
+#
+# Secrets (AUTH_PASSWORD) come from .env via env_file so they stay out of compose
+# and out of git. Copy .env.docker.example -> .env first.
+#
+#   docker compose build
+#   docker compose up -d                 # web + poller
+#   docker compose --profile tls up -d   # + Caddy TLS terminator (optional)
+
+services:
+  # ── Web (Next.js UI + API route handlers) — reader only ──────────────────
+  web:
+    build: .
+    image: polypanel:local
+    command: web
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATA_DIR: /data
+    # Bind to loopback only: the host never exposes :3000 to the network.
+    # Front it with the `tls` Caddy profile (or your own proxy) for the internet.
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - data:/data
+    # `/api/login` is exempt from the auth middleware and always answers over
+    # HTTP (405 to a GET), so this proves the server is up without a password.
+    healthcheck:
+      test:
+        ["CMD", "node", "-e",
+         "require('http').get('http://127.0.0.1:3000/api/login',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  # ── Poller (the ONLY process that talks to Polymarket) — sole writer ──────
+  poller:
+    build: .
+    image: polypanel:local
+    command: worker
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /data
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+  # ── Caddy TLS terminator (OPTIONAL) ──────────────────────────────────────
+  # Enable with:  docker compose --profile tls up -d
+  # Set DOMAIN and ACME_EMAIL in .env, point DNS at this host, and Caddy
+  # auto-provisions a Let's Encrypt cert and proxies 443 -> web:3000.
+  tls:
+    image: caddy:2-alpine
+    profiles: ["tls"]
+    depends_on:
+      - web
+    env_file: .env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  # SQLite file + WAL. `local` driver = on-disk; required for WAL locking.
+  data:
+  caddy_data:
+  caddy_config:

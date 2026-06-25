@@ -1,0 +1,21 @@
+# PolyPanel — optional Caddy reverse proxy (the `tls` compose profile).
+#
+# Enable with:  docker compose --profile tls up -d
+#
+# Caddy terminates TLS for {$DOMAIN}, auto-provisions a Let's Encrypt cert
+# (using {$ACME_EMAIL}), redirects HTTP->HTTPS, and proxies to the web service.
+# Set DOMAIN and ACME_EMAIL in .env and point your DNS A/AAAA record at this host.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	# `web` resolves on the compose network; it listens on 3000 (loopback inside
+	# its own container, reachable here over the shared network).
+	reverse_proxy web:3000
+
+	encode gzip
+	# HSTS — only safe once you're committed to HTTPS for this domain.
+	header Strict-Transport-Security "max-age=63072000; includeSubDomains"
+}
