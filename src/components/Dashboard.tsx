@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { HealthDTO, MarketViewDTO } from "@/lib/api-types";
 import { StatusBar } from "./StatusBar";
 import { MarketTable, type SortKey } from "./MarketTable";
 import { MarketDetail } from "./MarketDetail";
-import { Select } from "./ui/Controls";
+import { Input, Select } from "./ui/Controls";
 
 type FlagFilter = "" | "ARB" | "WIDE" | "DIVERGE";
 
@@ -27,6 +27,8 @@ export function Dashboard() {
   const [flag, setFlag] = useState<FlagFilter>("");
   const [minVolume, setMinVolume] = useState(0);
   const [sort, setSort] = useState<SortKey>("volume");
+  const [category, setCategory] = useState("");
+  const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -48,6 +50,23 @@ export function Dashboard() {
     const t = setInterval(load, REFRESH_MS);
     return () => clearInterval(t);
   }, [load]);
+
+  // Distinct sport/category tags present in the tracked markets.
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of markets) for (const c of m.categories) set.add(c);
+    return Array.from(set).sort();
+  }, [markets]);
+
+  // Client-side filters (category + free-text search) over the loaded set.
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return markets.filter(
+      (m) =>
+        (!category || m.categories.includes(category)) &&
+        (!q || m.question.toLowerCase().includes(q))
+    );
+  }, [markets, category, query]);
 
   return (
     <div className="space-y-4">
@@ -73,6 +92,28 @@ export function Dashboard() {
         </div>
       )}
 
+      {/* Search */}
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-refx-meta">
+          ⌕
+        </span>
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search markets (team, player, keyword…)"
+          className="w-full !pl-8"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-refx-meta hover:text-refx-text"
+            aria-label="Clear search"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
           <button
@@ -89,7 +130,24 @@ export function Dashboard() {
             {f.label}
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-2 text-sm text-refx-meta">
+        <div className="ml-auto flex flex-wrap items-center gap-2 text-sm text-refx-meta">
+          {categoryOptions.length > 1 && (
+            <>
+              <label htmlFor="cat" className="eyebrow">sport</label>
+              <Select
+                id="cat"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="">all</option>
+                {categoryOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            </>
+          )}
           <label htmlFor="sort" className="eyebrow">sort</label>
           <Select
             id="sort"
@@ -120,11 +178,17 @@ export function Dashboard() {
           Loading markets…
         </div>
       ) : (
-        <MarketTable
-          markets={markets}
-          onSelect={setSelected}
-          selectedSlug={selected}
-        />
+        <>
+          <div className="px-0.5 text-[11px] text-refx-meta tabular">
+            {visible.length} market{visible.length === 1 ? "" : "s"}
+            {(category || query) && ` of ${markets.length}`}
+          </div>
+          <MarketTable
+            markets={visible}
+            onSelect={setSelected}
+            selectedSlug={selected}
+          />
+        </>
       )}
 
       <p className="text-[11px] leading-relaxed text-refx-meta">

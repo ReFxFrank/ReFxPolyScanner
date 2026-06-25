@@ -165,9 +165,13 @@ export async function fetchMarkets(
     }
   }
 
+  // Keep each category's top markets (we already fetched top-`limit` per tag),
+  // rather than globally truncating — otherwise a high-volume category (e.g.
+  // the World Cup) would crowd out lower-volume sports like tennis. A generous
+  // hard cap keeps the book-fetch + history bounded.
   return Array.from(bySlug.values())
     .sort((a, b) => b.volume24h - a.volume24h)
-    .slice(0, limit);
+    .slice(0, 400);
 }
 
 /**
