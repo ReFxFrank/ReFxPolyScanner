@@ -20,6 +20,7 @@ const config: Config = {
           blue2: "#58a7d3",
           blueText: "#7db7ff",
           blueHi: "#9dccff",
+          cyan: "#22d3ee",
           // Text
           text: "#eef6ff",
           text2: "#f3f8ff",

@@ -90,6 +90,18 @@ export function Dashboard() {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2 text-sm text-refx-meta">
+          {/* Sort control — mobile only; desktop sorts via table headers. */}
+          <label htmlFor="sort" className="eyebrow md:hidden">sort</label>
+          <Select
+            id="sort"
+            className="md:hidden"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortKey)}
+          >
+            <option value="volume">24h volume</option>
+            <option value="implied">implied %</option>
+            <option value="spread">spread</option>
+          </Select>
           <label htmlFor="minvol" className="eyebrow">min 24h vol</label>
           <Select
             id="minvol"
