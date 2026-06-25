@@ -1,6 +1,6 @@
 "use client";
 
-import type { MarketViewDTO } from "@/lib/api-types";
+import type { LiveGameDTO, MarketViewDTO } from "@/lib/api-types";
 import { pct, usd } from "@/lib/format";
 import { FlagChip } from "./FlagChip";
 
@@ -103,18 +103,67 @@ export function buildMatches(markets: MarketViewDTO[]): Match[] {
   return matches.sort((a, b) => b.volume24h - a.volume24h);
 }
 
+// ── Live-score matching ────────────────────────────────────────────────────
+const normName = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+function namesMatch(a: string, b: string): boolean {
+  const x = normName(a);
+  const y = normName(b);
+  if (!x || !y) return false;
+  return x === y || (x.length >= 4 && (x.includes(y) || y.includes(x)));
+}
+
+/** Find the live game whose two teams match this match's two sides. */
+export function findLiveGame(
+  match: Match,
+  games: LiveGameDTO[]
+): LiveGameDTO | null {
+  const teams = match.outcomes
+    .map((o) => o.label)
+    .filter((l) => !/^(tie|draw)$/i.test(l));
+  if (teams.length < 2) return null;
+  const [a, b] = teams;
+  for (const g of games) {
+    const ah = namesMatch(a, g.home);
+    const aa = namesMatch(a, g.away);
+    const bh = namesMatch(b, g.home);
+    const ba = namesMatch(b, g.away);
+    if ((ah && ba) || (aa && bh)) return g;
+  }
+  return null;
+}
+
+function scoreFor(label: string, live: LiveGameDTO | null): number | null {
+  if (!live) return null;
+  if (namesMatch(label, live.home)) return live.homeScore;
+  if (namesMatch(label, live.away)) return live.awayScore;
+  return null;
+}
+
 export function MatchCard({
   match,
+  live,
   onSelect,
 }: {
   match: Match;
+  live?: LiveGameDTO | null;
   onSelect: (slug: string) => void;
 }) {
+  const isLive = live?.state === "in";
+  const isFinal = live?.state === "post";
+
   return (
-    <div className="overflow-hidden rounded-refx glass">
-      {/* header: competition + volume */}
+    <div
+      className={`overflow-hidden rounded-refx glass ${isLive ? "shadow-refx-blue" : ""}`}
+    >
+      {/* header: competition + live status / volume */}
       <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-3.5 py-2">
-        <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 items-center gap-1.5">
           {match.categories.map((c) => (
             <span
               key={c}
@@ -127,37 +176,56 @@ export function MatchCard({
             {match.title}
           </span>
         </div>
-        <span className="shrink-0 text-[11px] text-refx-meta tabular">
-          {usd(match.volume24h)}
-        </span>
+        {isLive ? (
+          <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-status-error">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-status-error" />
+            {live?.detail || "LIVE"}
+          </span>
+        ) : isFinal ? (
+          <span className="shrink-0 text-[11px] text-refx-meta">{live?.detail || "Final"}</span>
+        ) : (
+          <span className="shrink-0 text-[11px] text-refx-meta tabular">
+            {usd(match.volume24h)}
+          </span>
+        )}
       </div>
 
       {/* outcome rows — each tappable to open that market */}
       <div className="divide-y divide-white/[0.04]">
-        {match.outcomes.map((o) => (
-          <button
-            key={o.slug}
-            onClick={() => onSelect(o.slug)}
-            className="relative block w-full overflow-hidden text-left transition-colors hover:bg-white/[0.025]"
-          >
-            {/* neutral proportional bar (consensus probability, not a tip) */}
-            <div
-              className="absolute inset-y-0 left-0 bg-refx-blue/[0.10]"
-              style={{ width: `${Math.round((o.prob ?? 0) * 100)}%` }}
-            />
-            <div className="relative flex items-center justify-between gap-2 px-3.5 py-2.5">
-              <span className="truncate text-sm text-refx-text">{o.label}</span>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {o.flags.arb && <FlagChip kind="ARB" />}
-                {o.flags.wide && <FlagChip kind="WIDE" />}
-                {o.flags.diverge && <FlagChip kind="DIVERGE" />}
-                <span className="min-w-[3rem] rounded-md bg-white/[0.06] px-2 py-0.5 text-right text-sm font-semibold tabular text-refx-text">
-                  {pct(o.prob, 0)}
-                </span>
+        {match.outcomes.map((o) => {
+          const sc = scoreFor(o.label, live ?? null);
+          return (
+            <button
+              key={o.slug}
+              onClick={() => onSelect(o.slug)}
+              className="relative block w-full overflow-hidden text-left transition-colors hover:bg-white/[0.025]"
+            >
+              {/* neutral proportional bar (consensus probability, not a tip) */}
+              <div
+                className="absolute inset-y-0 left-0 bg-refx-blue/[0.10]"
+                style={{ width: `${Math.round((o.prob ?? 0) * 100)}%` }}
+              />
+              <div className="relative flex items-center justify-between gap-2 px-3.5 py-2.5">
+                <span className="truncate text-sm text-refx-text">{o.label}</span>
+                <div className="flex shrink-0 items-center gap-2">
+                  {o.flags.arb && <FlagChip kind="ARB" />}
+                  {o.flags.wide && <FlagChip kind="WIDE" />}
+                  {o.flags.diverge && <FlagChip kind="DIVERGE" />}
+                  {sc != null && (
+                    <span
+                      className={`min-w-[1.25rem] text-right text-sm font-semibold tabular ${isLive ? "text-status-error" : "text-refx-muted"}`}
+                    >
+                      {sc}
+                    </span>
+                  )}
+                  <span className="min-w-[3rem] rounded-md bg-white/[0.06] px-2 py-0.5 text-right text-sm font-semibold tabular text-refx-text">
+                    {pct(o.prob, 0)}
+                  </span>
+                </div>
               </div>
-            </div>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

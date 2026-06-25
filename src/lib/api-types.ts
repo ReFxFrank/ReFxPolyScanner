@@ -79,6 +79,15 @@ export interface SignalDTO {
   ts: number;
 }
 
+export interface LiveGameDTO {
+  home: string;
+  away: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  state: "pre" | "in" | "post";
+  detail: string;
+}
+
 export interface SideTeamDTO {
   name: string;
   badge: string | null;

@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { HealthDTO, MarketViewDTO } from "@/lib/api-types";
+import type { HealthDTO, LiveGameDTO, MarketViewDTO } from "@/lib/api-types";
 import { StatusBar } from "./StatusBar";
 import { MarketTable, type SortKey } from "./MarketTable";
 import { MarketDetail } from "./MarketDetail";
-import { MatchCard, buildMatches } from "./MatchCard";
+import { MatchCard, buildMatches, findLiveGame } from "./MatchCard";
 import { Input, Select } from "./ui/Controls";
 
 type FlagFilter = "" | "ARB" | "WIDE" | "DIVERGE";
@@ -31,6 +31,8 @@ export function Dashboard() {
   const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"markets" | "matches">("markets");
+  const [liveOnly, setLiveOnly] = useState(false);
+  const [scores, setScores] = useState<LiveGameDTO[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -45,6 +47,11 @@ export function Dashboard() {
     if (mRes.ok) setMarkets((await mRes.json()).markets);
     if (hRes.ok) setHealth(await hRes.json());
     setLoaded(true);
+    // Live scores (best-effort, server-cached) — don't block the table.
+    fetch(`/api/scores`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setScores(d.games))
+      .catch(() => {});
   }, [flag, minVolume, sort]);
 
   useEffect(() => {
@@ -70,10 +77,21 @@ export function Dashboard() {
     );
   }, [markets, category, query]);
 
-  const matches = useMemo(
-    () => (view === "matches" ? buildMatches(visible) : []),
-    [view, visible]
-  );
+  const allMatches = useMemo(() => {
+    if (view !== "matches") return [];
+    // Live games first, then by volume (buildMatches already sorted by volume).
+    return buildMatches(visible)
+      .map((m) => ({ match: m, live: findLiveGame(m, scores) }))
+      .sort(
+        (a, b) =>
+          (b.live?.state === "in" ? 1 : 0) - (a.live?.state === "in" ? 1 : 0)
+      );
+  }, [view, visible, scores]);
+
+  const liveCount = allMatches.filter((x) => x.live?.state === "in").length;
+  const matches = liveOnly
+    ? allMatches.filter((x) => x.live?.state === "in")
+    : allMatches;
 
   return (
     <div className="space-y-4">
@@ -200,18 +218,36 @@ export function Dashboard() {
         </div>
       ) : view === "matches" ? (
         <>
-          <div className="px-0.5 text-[11px] text-refx-meta tabular">
-            {matches.length} match{matches.length === 1 ? "" : "es"}
+          <div className="flex items-center gap-3 px-0.5 text-[11px] text-refx-meta tabular">
+            <span>
+              {matches.length} match{matches.length === 1 ? "" : "es"}
+            </span>
+            {liveCount > 0 && (
+              <button
+                data-on={liveOnly}
+                onClick={() => setLiveOnly((v) => !v)}
+                className="flex items-center gap-1.5 rounded-full border border-status-error/30 px-2 py-0.5 font-semibold text-status-error transition-colors data-[on=true]:bg-status-error/15"
+              >
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-status-error" />
+                {liveCount} live{liveOnly ? " · only" : ""}
+              </button>
+            )}
           </div>
           {matches.length === 0 ? (
             <div className="rounded-refx glass px-8 py-12 text-center text-sm text-refx-meta">
-              No head-to-head matches in view. Track a sport (e.g. soccer,
-              baseball) and clear filters to see games.
+              {liveOnly
+                ? "No live games right now."
+                : "No head-to-head matches in view. Track a sport (e.g. soccer, baseball) and clear filters to see games."}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {matches.map((m) => (
-                <MatchCard key={m.ticker} match={m} onSelect={setSelected} />
+              {matches.map(({ match, live }) => (
+                <MatchCard
+                  key={match.ticker}
+                  match={match}
+                  live={live}
+                  onSelect={setSelected}
+                />
               ))}
             </div>
           )}
