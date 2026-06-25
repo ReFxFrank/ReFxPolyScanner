@@ -7,11 +7,12 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/polypanel
-# Load non-secret + secret config (AUTH_PASSWORD) from an env file not in git.
-EnvironmentFile=-/etc/polypanel/polypanel.env
+# Defaults first; the env file (AUTH_PASSWORD, PUBLIC, MARKET_CATEGORIES, …) is
+# loaded LAST so it overrides these.
 Environment=NODE_ENV=production
 Environment=PORT=3000
 Environment=DATA_DIR=/var/lib/polypanel
+EnvironmentFile=-/etc/polypanel/polypanel.env
 ExecStart=/usr/bin/npm run start
 Restart=on-failure
 RestartSec=5

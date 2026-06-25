@@ -8,11 +8,14 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/polypanel
-EnvironmentFile=-/etc/polypanel/polypanel.env
+# Defaults first; the env file is loaded LAST so anything you set there
+# (MARKET_LIMIT, POLL_INTERVAL, MARKET_CATEGORIES, AUTH_PASSWORD, PUBLIC, …)
+# overrides these.
 Environment=NODE_ENV=production
 Environment=DATA_DIR=/var/lib/polypanel
 Environment=POLL_INTERVAL=25
 Environment=MARKET_LIMIT=50
+EnvironmentFile=-/etc/polypanel/polypanel.env
 ExecStart=/usr/bin/node dist/worker.js
 Restart=on-failure
 RestartSec=10

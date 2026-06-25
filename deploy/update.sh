@@ -63,6 +63,19 @@ log "Running 'npm run build' as $APP_USER…"
 run_as npm run build
 [ -f "$APP_DIR/dist/worker.js" ] || die "build did not produce dist/worker.js — not restarting services."
 
+# ── Refresh systemd units if they changed (e.g. env-load order) ──────────────
+units_changed=0
+for unit in polypanel-web polypanel-poller; do
+  if ! cmp -s "$REPO_DIR/deploy/$unit.service" "/etc/systemd/system/$unit.service" 2>/dev/null; then
+    cp "$REPO_DIR/deploy/$unit.service" "/etc/systemd/system/$unit.service"
+    units_changed=1
+  fi
+done
+if [ "$units_changed" -eq 1 ]; then
+  log "Updated systemd unit(s); reloading daemon…"
+  systemctl daemon-reload
+fi
+
 # ── Restart both services ────────────────────────────────────────────────────
 log "Restarting polypanel-web and polypanel-poller…"
 systemctl restart polypanel-web.service polypanel-poller.service
