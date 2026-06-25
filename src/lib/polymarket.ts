@@ -72,6 +72,10 @@ function parseMarketRow(
   const outcomes = parseJsonField<string>(m.outcomes);
   if (tokenIds.length === 0) return null; // no book → nothing to analyze
 
+  const event = Array.isArray(m.events)
+    ? (m.events[0] as Record<string, unknown> | undefined)
+    : undefined;
+
   return {
     slug,
     question,
@@ -83,6 +87,13 @@ function parseMarketRow(
     volume: Number(m.volume) || 0,
     volume24h: Number(m.volume24hr) || 0,
     categories: category ? [category] : [],
+    eventTicker:
+      event && typeof event.ticker === "string" ? event.ticker : null,
+    eventTitle: event && typeof event.title === "string" ? event.title : null,
+    groupLabel:
+      typeof m.groupItemTitle === "string" && m.groupItemTitle
+        ? m.groupItemTitle
+        : null,
   };
 }
 

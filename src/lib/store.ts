@@ -18,6 +18,9 @@ export interface MarketRow {
   updated_at: number;
   /** JSON array of category slugs, or null in global (unfiltered) mode. */
   categories: string | null;
+  event_ticker: string | null;
+  event_title: string | null;
+  group_item_title: string | null;
 }
 
 export interface BookRow {
@@ -68,15 +71,18 @@ export function upsertMarket(m: MarketRow): void {
     .prepare(
       `INSERT INTO markets
         (slug, question, condition_id, yes_token_id, no_token_id, outcomes,
-         is_binary, neg_risk, volume, volume_24h, updated_at, categories)
+         is_binary, neg_risk, volume, volume_24h, updated_at, categories,
+         event_ticker, event_title, group_item_title)
        VALUES (@slug, @question, @condition_id, @yes_token_id, @no_token_id,
          @outcomes, @is_binary, @neg_risk, @volume, @volume_24h, @updated_at,
-         @categories)
+         @categories, @event_ticker, @event_title, @group_item_title)
        ON CONFLICT(slug) DO UPDATE SET
          question=@question, condition_id=@condition_id,
          yes_token_id=@yes_token_id, no_token_id=@no_token_id, outcomes=@outcomes,
          is_binary=@is_binary, neg_risk=@neg_risk, volume=@volume,
-         volume_24h=@volume_24h, updated_at=@updated_at, categories=@categories`
+         volume_24h=@volume_24h, updated_at=@updated_at, categories=@categories,
+         event_ticker=@event_ticker, event_title=@event_title,
+         group_item_title=@group_item_title`
     )
     .run(m);
 }

@@ -49,6 +49,10 @@ export interface MarketView {
   updatedAt: number;
   /** Category slugs this market matched (empty in global mode). */
   categories: string[];
+  /** Polymarket event grouping for the Matches view. */
+  eventTicker: string | null;
+  eventTitle: string | null;
+  groupLabel: string | null;
   /** YES implied probability (the market mid), or null if no book. */
   impliedProb: number | null;
   spread: number | null;
@@ -110,6 +114,9 @@ export function buildMarketView(
     volume24h: market.volume_24h,
     updatedAt: market.updated_at,
     categories: parseCategories(market.categories),
+    eventTicker: market.event_ticker,
+    eventTitle: market.event_title,
+    groupLabel: market.group_item_title,
     impliedProb,
     spread,
     flags: { arb: arb?.type !== null && arb !== null, wide, diverge },

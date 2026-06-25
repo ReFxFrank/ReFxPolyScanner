@@ -10,6 +10,9 @@ export interface MarketViewDTO {
   volume24h: number;
   updatedAt: number;
   categories: string[];
+  eventTicker: string | null;
+  eventTitle: string | null;
+  groupLabel: string | null;
   impliedProb: number | null;
   spread: number | null;
   flags: { arb: boolean; wide: boolean; diverge: boolean };

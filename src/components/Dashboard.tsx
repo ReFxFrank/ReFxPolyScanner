@@ -5,6 +5,7 @@ import type { HealthDTO, MarketViewDTO } from "@/lib/api-types";
 import { StatusBar } from "./StatusBar";
 import { MarketTable, type SortKey } from "./MarketTable";
 import { MarketDetail } from "./MarketDetail";
+import { MatchCard, buildMatches } from "./MatchCard";
 import { Input, Select } from "./ui/Controls";
 
 type FlagFilter = "" | "ARB" | "WIDE" | "DIVERGE";
@@ -29,6 +30,7 @@ export function Dashboard() {
   const [sort, setSort] = useState<SortKey>("volume");
   const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<"markets" | "matches">("markets");
   const [selected, setSelected] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -67,6 +69,11 @@ export function Dashboard() {
         (!q || m.question.toLowerCase().includes(q))
     );
   }, [markets, category, query]);
+
+  const matches = useMemo(
+    () => (view === "matches" ? buildMatches(visible) : []),
+    [view, visible]
+  );
 
   return (
     <div className="space-y-4">
@@ -112,6 +119,20 @@ export function Dashboard() {
             ✕
           </button>
         )}
+      </div>
+
+      {/* Markets / Matches view toggle */}
+      <div className="flex items-center gap-1 rounded-full border border-refx-soft p-0.5 text-xs font-medium w-max">
+        {(["markets", "matches"] as const).map((v) => (
+          <button
+            key={v}
+            data-on={view === v}
+            onClick={() => setView(v)}
+            className="rounded-full px-3 py-1 capitalize text-refx-meta transition-colors data-[on=true]:bg-refx-blue/15 data-[on=true]:text-refx-blueText"
+          >
+            {v}
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -177,6 +198,24 @@ export function Dashboard() {
         <div className="rounded-refx glass px-8 py-12 text-center text-sm text-refx-meta">
           Loading markets…
         </div>
+      ) : view === "matches" ? (
+        <>
+          <div className="px-0.5 text-[11px] text-refx-meta tabular">
+            {matches.length} match{matches.length === 1 ? "" : "es"}
+          </div>
+          {matches.length === 0 ? (
+            <div className="rounded-refx glass px-8 py-12 text-center text-sm text-refx-meta">
+              No head-to-head matches in view. Track a sport (e.g. soccer,
+              baseball) and clear filters to see games.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {matches.map((m) => (
+                <MatchCard key={m.ticker} match={m} onSelect={setSelected} />
+              ))}
+            </div>
+          )}
+        </>
       ) : (
         <>
           <div className="px-0.5 text-[11px] text-refx-meta tabular">

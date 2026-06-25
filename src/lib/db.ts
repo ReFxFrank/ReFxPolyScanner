@@ -75,13 +75,22 @@ function migrate(conn: Database.Database): void {
     );
   `);
 
-  // Idempotent migration for DBs created before the `categories` column existed
-  // (e.g. an already-deployed VPS). ADD COLUMN is a no-op-safe one-liner.
-  const cols = conn
-    .prepare(`PRAGMA table_info(markets)`)
-    .all() as Array<{ name: string }>;
-  if (!cols.some((c) => c.name === "categories")) {
-    conn.exec(`ALTER TABLE markets ADD COLUMN categories TEXT`);
+  // Idempotent migrations for DBs created before later columns existed (e.g. an
+  // already-deployed VPS). ADD COLUMN is a no-op-safe one-liner.
+  const cols = new Set(
+    (conn.prepare(`PRAGMA table_info(markets)`).all() as Array<{ name: string }>).map(
+      (c) => c.name
+    )
+  );
+  for (const col of [
+    "categories",
+    "event_ticker",
+    "event_title",
+    "group_item_title",
+  ]) {
+    if (!cols.has(col)) {
+      conn.exec(`ALTER TABLE markets ADD COLUMN ${col} TEXT`);
+    }
   }
 }
 

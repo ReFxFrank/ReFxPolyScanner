@@ -104,6 +104,9 @@ function analyzeMarket(
     categories: market.categories.length
       ? JSON.stringify(market.categories)
       : null,
+    event_ticker: market.eventTicker,
+    event_title: market.eventTitle,
+    group_item_title: market.groupLabel,
   });
 
   for (const a of analyzed) {

@@ -59,4 +59,9 @@ export interface GammaMarket {
   volume24h: number;
   /** Category tag slugs this market matched (e.g. politics/sports/business). */
   categories: string[];
+  /** Polymarket event grouping (e.g. a "Japan vs. Sweden" match). */
+  eventTicker: string | null;
+  eventTitle: string | null;
+  /** This market's outcome label within the event (e.g. "Japan", "Tie"). */
+  groupLabel: string | null;
 }
